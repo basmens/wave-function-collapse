@@ -15,6 +15,10 @@ public final class Tile {
     return this.possibilities.size() == 1;
   }
 
+  public synchronized int getEntropy() {
+    return possibilities.size();
+  }
+
   public synchronized IntModule getModule() {
     if (isCollapsed()) {
       return possibilities.toArray(new IntModule[]{})[0];
@@ -30,6 +34,13 @@ public final class Tile {
   public synchronized void setPossibilities(Set<IntModule> possibilities) {
     if (!isCollapsed()) {
       this.possibilities = new HashSet<>(possibilities);
+    }
+  }
+
+  public synchronized void colapse(IntModule intModule) {
+    if (!isCollapsed()) {
+      possibilities = new HashSet<>();
+      possibilities.add(intModule);
     }
   }
 }

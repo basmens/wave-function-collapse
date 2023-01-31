@@ -134,7 +134,7 @@ public class Main extends PApplet {
 
 
   private void startWfc() {
-    wfc = new Wfc(24, 12, features, 8);
+    wfc = new Wfc(200, 100, features, 5);
     wfc.start();
   }
 
@@ -181,12 +181,17 @@ public class Main extends PApplet {
   // ===================================================================================================================
   @Override
   public void mousePressed() {
-    double tileW = (double) width / wfc.getGridW();
-    double tileH = (double) height / wfc.getGridH();
-    int x = (int) Math.floor(mouseX / tileW);
-    int y = (int) Math.floor(mouseY / tileH);
+    if (mouseButton == LEFT) {
+      double tileW = (double) width / wfc.getGridW();
+      double tileH = (double) height / wfc.getGridH();
+      int x = (int) Math.floor(mouseX / tileW);
+      int y = (int) Math.floor(mouseY / tileH);
 
-    wfc.collapseTile(x, y);
+      wfc.collapseTile(x, y);
+    } else {
+      startWfc();
+      // println(wfc.isRunning());
+    }
   }
 
   @Override
