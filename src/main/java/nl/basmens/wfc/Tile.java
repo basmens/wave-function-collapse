@@ -4,42 +4,32 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import nl.benmens.processing.PApplet;
-
-public class Tile {
+public final class Tile {
   private HashSet<IntModule> possibilities = new HashSet<>();
-  private boolean collapsed;
 
   public Tile(List<IntModule> initialPossibilities) {
     possibilities.addAll(initialPossibilities);
-
-    if (this.possibilities.size() == 1) {
-      collapsed = true;
-    }
   }
 
-  public boolean isCollapsed() {
-    return collapsed;
+  public synchronized boolean isCollapsed() {
+    return this.possibilities.size() == 1;
   }
 
-  public IntModule getModule() {
-    if(collapsed) {
+  public synchronized IntModule getModule() {
+    if (isCollapsed()) {
       return possibilities.toArray(new IntModule[]{})[0];
     }
     return null;
   }
 
-  public Set<IntModule> getPossibilities() {
-    return (Set<IntModule>) possibilities.clone();
+  @SuppressWarnings("unchecked")
+  public synchronized HashSet<IntModule> getPossibilities() {
+    return (HashSet<IntModule>) possibilities.clone();
   }
 
-  public void setPossibilities(Set<IntModule> possibilities) {
-    if (!collapsed) {
+  public synchronized void setPossibilities(Set<IntModule> possibilities) {
+    if (!isCollapsed()) {
       this.possibilities = new HashSet<>(possibilities);
-
-      if (this.possibilities.size() == 1) {
-        collapsed = true;
-      }
     }
   }
 }

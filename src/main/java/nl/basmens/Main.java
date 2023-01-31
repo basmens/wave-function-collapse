@@ -10,9 +10,9 @@ import nl.basmens.wfc.WfcFeatures;
 import nl.benmens.processing.PApplet;
 import processing.core.PImage;
 import processing.opengl.PGraphicsOpenGL;
-import processing.event.MouseEvent;
 
 public class Main extends PApplet {
+  private WfcFeatures features;
   private Wfc wfc;
 
   // ===================================================================================================================
@@ -20,16 +20,20 @@ public class Main extends PApplet {
   // ===================================================================================================================
   @Override
   public void settings() {
-    // fullScreen(P2D);
-    size(1800, 1200, P2D);
+    size(3600, 2040, P2D);  // FullScreen
+    // size(1800, 1200, P2D);
   }
 
   @Override
   public void setup() {
     // A workaround for noSmooth() not being compatible with P2D
     ((PGraphicsOpenGL) g).textureSampling(3);
+    surface.setLocation(0, 0);
 
     // Load modules
+    // Reference images:
+    // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-1.png
+    // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-2.png
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
 
     String path = Main.class.getResource("/patterns/circuit/").toString().substring(6);
@@ -94,7 +98,7 @@ public class Main extends PApplet {
     keyPairsMap.addPair("pin", "pin");
 
     // Create WfcFeatures
-    WfcFeatures features = new WfcFeatures(modules.toArray(new nl.basmens.wfc.Module[] {}), keyPairsMap, true);
+    features = new WfcFeatures(modules.toArray(nl.basmens.wfc.Module[]::new), keyPairsMap, true);
 
     int i = 0;
     StringBuilder top = new StringBuilder();
@@ -124,9 +128,16 @@ public class Main extends PApplet {
     println(middle.toString());
     println(bottom.toString());
 
-    // Create Wfc
-    wfc = new Wfc(15, 10, features, 5);
+    // Start Wfc
+    startWfc();
   }
+
+
+  private void startWfc() {
+    wfc = new Wfc(30, 17, features, 8);
+    wfc.start();
+  }
+
 
   @Override
   public void draw() {
@@ -134,7 +145,7 @@ public class Main extends PApplet {
 
     // Draw grid
     stroke(50);
-    strokeWeight(6);
+    strokeWeight(4);
     double tileW = (double) width / wfc.getGridW();
     for (int x = 1; x < wfc.getGridW(); x++) {
       line((float) (x * tileW), 0, (float) (x * tileW), height);
@@ -156,7 +167,7 @@ public class Main extends PApplet {
           image(img, 0, 0, (float) tileW, (float) tileH);
           popMatrix();
         } else {
-          fill(160);
+          fill(180);
           textSize(60);
           textAlign(CENTER, CENTER);
           text(grid[x][y].getPossibilities().size(), (float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
@@ -169,7 +180,19 @@ public class Main extends PApplet {
   // Events
   // ===================================================================================================================
   @Override
-  public void mouseClicked(MouseEvent event) {
+  public void mousePressed() {
+    double tileW = (double) width / wfc.getGridW();
+    double tileH = (double) height / wfc.getGridH();
+    int x = (int) Math.floor(mouseX / tileW);
+    int y = (int) Math.floor(mouseY / tileH);
+
+    wfc.collapseTile(x, y);
+  }
+
+  @Override
+  public void keyPressed() {
+    // startWfc();
+    save("C:/Users/basme/Downloads/wfc result.png");
   }
 
   // ===================================================================================================================

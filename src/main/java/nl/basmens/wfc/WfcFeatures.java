@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import processing.core.PApplet;
 
@@ -45,14 +44,15 @@ public class WfcFeatures {
     this.intModules = new ArrayList<>(this.modules.length);
 
     // Create empty arrays of sets
-    ArrayList<HashSet<IntModule>> modulesWithUpKey = new ArrayList<>(stringToIntMap.size());
-    ArrayList<HashSet<IntModule>> modulesWithRightKey = new ArrayList<>(stringToIntMap.size());
-    ArrayList<HashSet<IntModule>> modulesWithDownKey = new ArrayList<>(stringToIntMap.size());
-    ArrayList<HashSet<IntModule>> modulesWithLeftKey = new ArrayList<>(stringToIntMap.size());
-    modulesForUpKey = new ArrayList<>(stringToIntMap.size());
-    modulesForRightKey = new ArrayList<>(stringToIntMap.size());
-    modulesForDownKey = new ArrayList<>(stringToIntMap.size());
-    modulesForLeftKey = new ArrayList<>(stringToIntMap.size());
+    int keysCount = stringToIntMap.size();
+    ArrayList<HashSet<IntModule>> modulesWithUpKey = new ArrayList<>(keysCount);
+    ArrayList<HashSet<IntModule>> modulesWithRightKey = new ArrayList<>(keysCount);
+    ArrayList<HashSet<IntModule>> modulesWithDownKey = new ArrayList<>(keysCount);
+    ArrayList<HashSet<IntModule>> modulesWithLeftKey = new ArrayList<>(keysCount);
+    modulesForUpKey = new ArrayList<>(keysCount);
+    modulesForRightKey = new ArrayList<>(keysCount);
+    modulesForDownKey = new ArrayList<>(keysCount);
+    modulesForLeftKey = new ArrayList<>(keysCount);
     for (i = 0; i < stringToIntMap.size(); i++) {
       modulesWithUpKey.add(new HashSet<>());
       modulesWithRightKey.add(new HashSet<>());
@@ -108,7 +108,7 @@ public class WfcFeatures {
       return new Module(m.keyDown, m.keyLeft, m.keyUp, m.keyRight, new int[] { 2 }, m.getChildItem());
 
     } else {
-      return new Module(m.keyRight, m.keyDown, m.keyLeft, m.keyUp,new int[] { 3 },  m.getChildItem());
+      return new Module(m.keyRight, m.keyDown, m.keyLeft, m.keyUp, new int[] { 3 }, m.getChildItem());
     }
   }
 
@@ -131,19 +131,19 @@ public class WfcFeatures {
     return (List<IntModule>) intModules.clone();
   }
 
-  public List<Set<IntModule>> getModulesForUpKey() {
-    return new ArrayList<>(modulesForUpKey.stream().map(s -> (Set<IntModule>) s.clone()).toList());
+  public List<HashSet<IntModule>> getModulesForUpKey() {
+    return new ArrayList<>(modulesForUpKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
   }
 
-  public List<Set<IntModule>> getModulesForRightKey() {
-    return new ArrayList<>(modulesForRightKey.stream().map(s -> (Set<IntModule>) s.clone()).toList());
+  public List<HashSet<IntModule>> getModulesForRightKey() {
+    return new ArrayList<>(modulesForRightKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
   }
 
-  public List<Set<IntModule>> getModulesForDownKey() {
-    return new ArrayList<>(modulesForDownKey.stream().map(s -> (Set<IntModule>) s.clone()).toList());
+  public List<HashSet<IntModule>> getModulesForDownKey() {
+    return new ArrayList<>(modulesForDownKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
   }
 
-  public List<Set<IntModule>> getModulesForLeftKey() {
-    return new ArrayList<>(modulesForLeftKey.stream().map(s -> (Set<IntModule>) s.clone()).toList());
+  public List<HashSet<IntModule>> getModulesForLeftKey() {
+    return new ArrayList<>(modulesForLeftKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
   }
 }

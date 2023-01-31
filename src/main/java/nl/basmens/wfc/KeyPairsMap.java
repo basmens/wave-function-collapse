@@ -22,7 +22,7 @@ public class KeyPairsMap {
   }
 
   public boolean checkPair(String a, String b) {
-    return pairs.get(a).contains(b);
+    return pairs.containsKey(a) && pairs.get(a).contains(b);
   }
 
   public Set<String> getKeySet() {
@@ -31,6 +31,9 @@ public class KeyPairsMap {
 
   @SuppressWarnings("unchecked")
   public Set<String> getPairs(String key) {
+    if (!pairs.containsKey(key)) {
+      return new HashSet<>();
+    }
     return (Set<String>) pairs.get(key).clone();
   }
 
