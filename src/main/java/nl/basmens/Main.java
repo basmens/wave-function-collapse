@@ -20,7 +20,7 @@ public class Main extends PApplet {
   // ===================================================================================================================
   @Override
   public void settings() {
-    size(3600, 2040, P2D);  // FullScreen
+    size(3600, 1800, P2D);  // FullScreen
     // size(1800, 1200, P2D);
   }
 
@@ -36,7 +36,7 @@ public class Main extends PApplet {
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-2.png
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
 
-    String path = Main.class.getResource("/patterns/circuit/").toString().substring(6);
+    String path = Main.class.getResource("/patterns/circuit3/").toString().substring(6);
     PImage image = loadImage(path + "board.png");
     modules.add(new nl.basmens.wfc.Module("board", "board", "board", "board",
         new int[] { 0 }, image));
@@ -134,7 +134,7 @@ public class Main extends PApplet {
 
 
   private void startWfc() {
-    wfc = new Wfc(30, 17, features, 8);
+    wfc = new Wfc(24, 12, features, 8);
     wfc.start();
   }
 
