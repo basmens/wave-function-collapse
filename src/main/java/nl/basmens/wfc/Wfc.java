@@ -136,12 +136,12 @@ public final class Wfc {
         entropyLists[entropy] = next;
       }
 
-      if (next != null && next.tileUpdater != null) {
+      if (next != null) {
         break;
       }
     }
 
-    if (next == null || next.tileUpdater == null) {
+    if (next == null) {
       isRunning = false;
       return;
     }
