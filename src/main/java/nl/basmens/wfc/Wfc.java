@@ -7,8 +7,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import nl.benmens.processing.PApplet;
-
 public final class Wfc {
   private int gridW;
   private int gridH;
@@ -119,8 +117,10 @@ public final class Wfc {
 
   public void collapseTile(TileUpdater tileUpdater) {
     Tile tile = tileUpdater.getTile();
-    IntModule intModule = tile.getPossibilities().toArray(IntModule[]::new)[random.nextInt(0,
-        tile.getPossibilities().size())];
+    IntModule intModule = tile.getPossibilities()
+      .toArray(IntModule[]::new)[
+        random.nextInt(0, tile.getPossibilities().size())
+      ];
     tile.colapse(intModule);
 
     tileUpdater.updateChanged();
@@ -128,43 +128,31 @@ public final class Wfc {
 
   public void collapseTile() {
     int entropy;
-    int tileCount = 0;
+    LinkedListElement next = null;
     for (entropy = 0; entropy < entropyLists.length; entropy++) {
-      LinkedListElement next = entropyLists[entropy];
-      LinkedListElement current = new LinkedListElement(next, null);
-      entropyLists[entropy] = current;
-      tileCount = 0;
-      
-      boolean succes = false;
-      while (next != null) {
-        if (next.tileUpdater == null) {
-          next = next.next;
-          current.next = next;
-        } else {
-          current = next;
-          next = current.next;
-          tileCount++;
-          succes = true;
-        }
+      next = entropyLists[entropy];
+      while (next != null && next.tileUpdater == null) {
+        next = next.next;
+        entropyLists[entropy] = next;
       }
 
-      if (succes) {
+      if (next != null) {
         break;
       }
     }
 
-    if (entropy == entropyLists.length) {
+    if (next == null) {
       isRunning = false;
       return;
     }
 
-    int randomDepth = random.nextInt(tileCount);
-    LinkedListElement element = entropyLists[entropy];
-    for (int i = 0; i < randomDepth; i++) {
-      element = element.next;
-    }
+    // int randomDepth = random.nextInt(tileCount);
+    // LinkedListElement element = entropyLists[entropy];
+    // for (int i = 0; i < randomDepth; i++) {
+    //   element = element.next;
+    // }
 
-    collapseTile(element.next.tileUpdater);
+    collapseTile(next.tileUpdater);
   }
 
   // ===================================================================================================================
@@ -320,8 +308,8 @@ public final class Wfc {
 
     private void submit() {
       if (!submitted && !tile.isCollapsed()) {
-        executorService.submit(this);
         threadCounter.incrementAndGet();
+        executorService.submit(this);
       }
       submitted = true;
     }
@@ -414,8 +402,12 @@ public final class Wfc {
         updateChanged();
       }
       
+      System.out.println("run end");
+
       if (threadCounter.decrementAndGet() == 0) {
+        System.out.println("before collapseUntillUpdates");
         collapseUntillUpdates();
+        System.out.println("after collapseUntillUpdates");
       }
     }
 
