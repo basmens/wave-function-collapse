@@ -5,6 +5,7 @@ import java.net.URL;
 import java.nio.file.FileSystems;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Locale;
 
 import nl.basmens.wfc.IntModule;
 import nl.basmens.wfc.KeyPairsMap;
@@ -24,7 +25,7 @@ public class Main extends PApplet {
   // ===================================================================================================================
   @Override
   public void settings() {
-    size(1600, 800, P2D);  // FullScreen
+    size(3200, 1600, P2D);  // FullScreen
     // size(1800, 1200, P2D);
   }
 
@@ -140,15 +141,18 @@ public class Main extends PApplet {
     println(middle.toString());
     println(bottom.toString());
 
-    // frameRate(1f);
-
-    // Start Wfc
     startWfc();
   }
 
-
+  private int startTime;
+  private boolean started = false;
+  private ArrayList<Integer> times = new ArrayList<>();
+  private int threadCount = 1;
   private void startWfc() {
-    wfc = new Wfc(100, 50, features, 3);
+    startTime = millis();
+    started = true;
+
+    wfc = new Wfc(100, 50, features, threadCount);
     wfc.start();
   }
 
@@ -156,6 +160,23 @@ public class Main extends PApplet {
   @Override
   public void draw() {
     background(0);
+
+    if (!wfc.isRunning() && started) {
+      int timeElapsed = millis() - startTime;
+      times.add(timeElapsed);
+      started = false;
+
+      if (times.size() == 1000) {
+        double average = times.stream().mapToInt(x -> x).sum() / (double) times.size();
+        // PApplet.println(timeElapsed + "  -  " + String.format(Locale.ENGLISH, "%.2f", average) + "  -  " + times.size());
+        PApplet.println(threadCount + ":  " + String.format(Locale.ENGLISH, "%.3f", average));
+
+        times = new ArrayList<>();
+        threadCount++;
+      }
+
+      startWfc();
+    }
 
     // Draw grid
     stroke(50);
@@ -182,12 +203,20 @@ public class Main extends PApplet {
           popMatrix();
         } else {
           fill(180);
-          textSize(60);
+          textSize(30);
           textAlign(CENTER, CENTER);
           text(grid[x][y].getPossibilities().size(), (float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
         }
       }
     }
+
+    fill(0, 150);
+    noStroke();
+    rect(0, 0, 220, 90);
+    fill(255);
+    textAlign(LEFT, TOP);
+    textSize(60);
+    text(times.size(), 20, 8);
   }
 
   // ===================================================================================================================
@@ -210,8 +239,10 @@ public class Main extends PApplet {
 
   @Override
   public void keyPressed() {
-    // startWfc();
-    save("C:/Users/basme/Downloads/wfc result.png");
+    // save("C:/Users/basme/Downloads/wfc result.png");
+    times = new ArrayList<>();
+    threadCount = 1;
+    startWfc();
   }
 
   // ===================================================================================================================

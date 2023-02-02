@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import nl.benmens.processing.PApplet;
+
 public final class Wfc {
   private int gridW;
   private int gridH;
@@ -36,7 +38,7 @@ public final class Wfc {
     setWfcFeatures(wfcFeatures);
     this.executorService = Executors.newFixedThreadPool(threadCount);
     threadCounter = new AtomicInteger();
-    
+
     createGrid();
   }
 
@@ -56,7 +58,7 @@ public final class Wfc {
     for (int x = 0; x < gridW; x++) {
       for (int y = 0; y < gridH; y++) {
         grid[x][y] = new Tile(intModules);
-        tileUpdaters[x][y] = new TileUpdater(grid[x][y], x, y);
+        tileUpdaters[x][y] = new TileUpdater(grid[x][y]);
 
         if (x > 0) {
           TileUpdater left = tileUpdaters[x - 1][y];
@@ -118,9 +120,7 @@ public final class Wfc {
   public void collapseTile(TileUpdater tileUpdater) {
     Tile tile = tileUpdater.getTile();
     IntModule intModule = tile.getPossibilities()
-      .toArray(IntModule[]::new)[
-        random.nextInt(0, tile.getPossibilities().size())
-      ];
+        .toArray(IntModule[]::new)[random.nextInt(0, tile.getPossibilities().size())];
     tile.colapse(intModule);
 
     tileUpdater.updateChanged();
@@ -137,6 +137,7 @@ public final class Wfc {
       }
 
       if (next != null) {
+        entropyLists[entropy] = next.next;
         break;
       }
     }
@@ -149,7 +150,7 @@ public final class Wfc {
     // int randomDepth = random.nextInt(tileCount);
     // LinkedListElement element = entropyLists[entropy];
     // for (int i = 0; i < randomDepth; i++) {
-    //   element = element.next;
+    // element = element.next;
     // }
 
     collapseTile(next.tileUpdater);
@@ -210,6 +211,7 @@ public final class Wfc {
     private boolean updateFromDown;
     private boolean updateFromLeft;
     private boolean submitted;
+    private Object runningMonitor = new Object();
 
     private final Tile tile;
     private Tile tileUp;
@@ -223,17 +225,11 @@ public final class Wfc {
 
     private LinkedListElement linkedListElement;
 
-    public int x;
-    public int y;
-
     // -----------------------------------------------------------------------------------------------------------------
     // Creation
     // -----------------------------------------------------------------------------------------------------------------
-    public TileUpdater(Tile tile, int x, int y) {
+    public TileUpdater(Tile tile) {
       this.tile = tile;
-
-      this.x = x;
-      this.y = y;
 
       prefixNewEntropyListElement();
     }
@@ -270,6 +266,14 @@ public final class Wfc {
 
     private void updateEntropyInList() {
       linkedListElement.tileUpdater = null;
+
+      if (tile.getEntropy() == 0) {
+        isRunning = false;
+        executorService.shutdown();
+        // PApplet.println("No solution");
+        return;
+      }
+
       if (!tile.isCollapsed()) {
         prefixNewEntropyListElement();
       }
@@ -313,7 +317,7 @@ public final class Wfc {
       }
       submitted = true;
     }
-    
+
     // -----------------------------------------------------------------------------------------------------------------
     // Evaluating
     // -----------------------------------------------------------------------------------------------------------------
@@ -322,7 +326,7 @@ public final class Wfc {
       updaterRight.updateFromLeft();
       updaterDown.updateFromUp();
       updaterLeft.updateFromRight();
-      
+
       updateEntropyInList();
     }
 
@@ -334,83 +338,70 @@ public final class Wfc {
 
     @Override
     public void run() {
-      // Syncronize the update variables
-      boolean localUpdateFromUp;
-      boolean localUpdateFromRight;
-      boolean localUpdateFromDown;
-      boolean localUpdateFromLeft;
-      synchronized (this) {
-        localUpdateFromUp = updateFromUp;
-        localUpdateFromRight = updateFromRight;
-        localUpdateFromDown = updateFromDown;
-        localUpdateFromLeft = updateFromLeft;
-        updateFromUp = false;
-        updateFromRight = false;
-        updateFromDown = false;
-        updateFromLeft = false;
-        submitted = false;
-      }
-      
-      // Do the computing
-      boolean changed = false;
-      if (localUpdateFromUp) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileUp.getPossibilities().forEach(m -> keys.add(m.keyDown));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForDownKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromRight) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileRight.getPossibilities().forEach(m -> keys.add(m.keyLeft));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForLeftKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromDown) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileDown.getPossibilities().forEach(m -> keys.add(m.keyUp));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForUpKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromLeft) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileLeft.getPossibilities().forEach(m -> keys.add(m.keyRight));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForRightKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      
-      if (changed) {
-        updateChanged();
-      }
-      
-      System.out.println("run end");
+      synchronized (runningMonitor) {
+        // Syncronize the update variables
+        boolean localUpdateFromUp;
+        boolean localUpdateFromRight;
+        boolean localUpdateFromDown;
+        boolean localUpdateFromLeft;
+        synchronized (this) {
+          localUpdateFromUp = updateFromUp;
+          localUpdateFromRight = updateFromRight;
+          localUpdateFromDown = updateFromDown;
+          localUpdateFromLeft = updateFromLeft;
+          updateFromUp = false;
+          updateFromRight = false;
+          updateFromDown = false;
+          updateFromLeft = false;
+          submitted = false;
+        }
 
-      if (threadCounter.decrementAndGet() == 0) {
-        System.out.println("before collapseUntillUpdates");
-        collapseUntillUpdates();
-        System.out.println("after collapseUntillUpdates");
+        // Do the computing
+        boolean changed = false;
+        HashSet<IntModule> newPossibilities = tile.getPossibilities();
+        if (localUpdateFromUp) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileUp.getPossibilities().forEach(m -> keys.add(m.keyDown));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForDownKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromRight) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileRight.getPossibilities().forEach(m -> keys.add(m.keyLeft));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForLeftKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromDown) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileDown.getPossibilities().forEach(m -> keys.add(m.keyUp));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForUpKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromLeft) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileLeft.getPossibilities().forEach(m -> keys.add(m.keyRight));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForRightKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+
+        if (changed) {
+          tile.setPossibilities(newPossibilities);
+          updateChanged();
+        }
+
+        if (threadCounter.decrementAndGet() == 0) {
+          collapseUntillUpdates();
+        }
       }
     }
-
 
     public Tile getTile() {
       return tile;
