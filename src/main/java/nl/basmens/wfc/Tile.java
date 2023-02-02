@@ -12,7 +12,7 @@ public final class Tile {
   }
 
   public synchronized boolean isCollapsed() {
-    return this.possibilities.size() == 1;
+    return possibilities.size() == 1;
   }
 
   public synchronized int getEntropy() {

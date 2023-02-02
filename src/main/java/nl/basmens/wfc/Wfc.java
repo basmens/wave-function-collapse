@@ -38,7 +38,7 @@ public final class Wfc {
     setWfcFeatures(wfcFeatures);
     this.executorService = Executors.newFixedThreadPool(threadCount);
     threadCounter = new AtomicInteger();
-    
+
     createGrid();
   }
 
@@ -58,7 +58,7 @@ public final class Wfc {
     for (int x = 0; x < gridW; x++) {
       for (int y = 0; y < gridH; y++) {
         grid[x][y] = new Tile(intModules);
-        tileUpdaters[x][y] = new TileUpdater(grid[x][y], x, y);
+        tileUpdaters[x][y] = new TileUpdater(grid[x][y]);
 
         if (x > 0) {
           TileUpdater left = tileUpdaters[x - 1][y];
@@ -119,8 +119,8 @@ public final class Wfc {
 
   public void collapseTile(TileUpdater tileUpdater) {
     Tile tile = tileUpdater.getTile();
-    IntModule intModule = tile.getPossibilities().toArray(IntModule[]::new)[random.nextInt(0,
-        tile.getPossibilities().size())];
+    IntModule intModule = tile.getPossibilities()
+        .toArray(IntModule[]::new)[random.nextInt(0, tile.getPossibilities().size())];
     tile.colapse(intModule);
 
     tileUpdater.updateChanged();
@@ -128,43 +128,32 @@ public final class Wfc {
 
   public void collapseTile() {
     int entropy;
-    int tileCount = 0;
+    LinkedListElement next = null;
     for (entropy = 0; entropy < entropyLists.length; entropy++) {
-      LinkedListElement next = entropyLists[entropy];
-      LinkedListElement current = new LinkedListElement(next, null);
-      entropyLists[entropy] = current;
-      tileCount = 0;
-      
-      boolean succes = false;
-      while (next != null) {
-        if (next.tileUpdater == null) {
-          next = next.next;
-          current.next = next;
-        } else {
-          current = next;
-          next = current.next;
-          tileCount++;
-          succes = true;
-        }
+      next = entropyLists[entropy];
+      while (next != null && next.tileUpdater == null) {
+        next = next.next;
+        entropyLists[entropy] = next;
       }
 
-      if (succes) {
+      if (next != null) {
+        entropyLists[entropy] = next.next;
         break;
       }
     }
 
-    if (entropy == entropyLists.length) {
+    if (next == null) {
       isRunning = false;
       return;
     }
 
-    int randomDepth = random.nextInt(tileCount);
-    LinkedListElement element = entropyLists[entropy];
-    for (int i = 0; i < randomDepth; i++) {
-      element = element.next;
-    }
+    // int randomDepth = random.nextInt(tileCount);
+    // LinkedListElement element = entropyLists[entropy];
+    // for (int i = 0; i < randomDepth; i++) {
+    // element = element.next;
+    // }
 
-    collapseTile(element.next.tileUpdater);
+    collapseTile(next.tileUpdater);
   }
 
   // ===================================================================================================================
@@ -222,6 +211,7 @@ public final class Wfc {
     private boolean updateFromDown;
     private boolean updateFromLeft;
     private boolean submitted;
+    private Object runningMonitor = new Object();
 
     private final Tile tile;
     private Tile tileUp;
@@ -235,17 +225,11 @@ public final class Wfc {
 
     private LinkedListElement linkedListElement;
 
-    public int x;
-    public int y;
-
     // -----------------------------------------------------------------------------------------------------------------
     // Creation
     // -----------------------------------------------------------------------------------------------------------------
-    public TileUpdater(Tile tile, int x, int y) {
+    public TileUpdater(Tile tile) {
       this.tile = tile;
-
-      this.x = x;
-      this.y = y;
 
       prefixNewEntropyListElement();
     }
@@ -282,6 +266,14 @@ public final class Wfc {
 
     private void updateEntropyInList() {
       linkedListElement.tileUpdater = null;
+
+      if (tile.getEntropy() == 0) {
+        isRunning = false;
+        executorService.shutdown();
+        // PApplet.println("No solution");
+        return;
+      }
+
       if (!tile.isCollapsed()) {
         prefixNewEntropyListElement();
       }
@@ -320,12 +312,12 @@ public final class Wfc {
 
     private void submit() {
       if (!submitted && !tile.isCollapsed()) {
-        executorService.submit(this);
         threadCounter.incrementAndGet();
+        executorService.submit(this);
       }
       submitted = true;
     }
-    
+
     // -----------------------------------------------------------------------------------------------------------------
     // Evaluating
     // -----------------------------------------------------------------------------------------------------------------
@@ -334,7 +326,7 @@ public final class Wfc {
       updaterRight.updateFromLeft();
       updaterDown.updateFromUp();
       updaterLeft.updateFromRight();
-      
+
       updateEntropyInList();
     }
 
@@ -346,79 +338,70 @@ public final class Wfc {
 
     @Override
     public void run() {
-      // Syncronize the update variables
-      boolean localUpdateFromUp;
-      boolean localUpdateFromRight;
-      boolean localUpdateFromDown;
-      boolean localUpdateFromLeft;
-      synchronized (this) {
-        localUpdateFromUp = updateFromUp;
-        localUpdateFromRight = updateFromRight;
-        localUpdateFromDown = updateFromDown;
-        localUpdateFromLeft = updateFromLeft;
-        updateFromUp = false;
-        updateFromRight = false;
-        updateFromDown = false;
-        updateFromLeft = false;
-        submitted = false;
-      }
-      
-      // Do the computing
-      boolean changed = false;
-      if (localUpdateFromUp) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileUp.getPossibilities().forEach(m -> keys.add(m.keyDown));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForDownKey.get(k)));
-        
+      synchronized (runningMonitor) {
+        // Syncronize the update variables
+        boolean localUpdateFromUp;
+        boolean localUpdateFromRight;
+        boolean localUpdateFromDown;
+        boolean localUpdateFromLeft;
+        synchronized (this) {
+          localUpdateFromUp = updateFromUp;
+          localUpdateFromRight = updateFromRight;
+          localUpdateFromDown = updateFromDown;
+          localUpdateFromLeft = updateFromLeft;
+          updateFromUp = false;
+          updateFromRight = false;
+          updateFromDown = false;
+          updateFromLeft = false;
+          submitted = false;
+        }
+
+        // Do the computing
+        boolean changed = false;
         HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromRight) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileRight.getPossibilities().forEach(m -> keys.add(m.keyLeft));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForLeftKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromDown) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileDown.getPossibilities().forEach(m -> keys.add(m.keyUp));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForUpKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      if (localUpdateFromLeft) {
-        HashSet<Integer> keys = new HashSet<>();
-        tileLeft.getPossibilities().forEach(m -> keys.add(m.keyRight));
-        
-        HashSet<IntModule> comparePossibilities = new HashSet<>();
-        keys.forEach(k -> comparePossibilities.addAll(modulesForRightKey.get(k)));
-        
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        tile.setPossibilities(newPossibilities);
-      }
-      
-      if (changed) {
-        updateChanged();
-      }
-      
-      if (threadCounter.decrementAndGet() == 0) {
-        collapseUntillUpdates();
+        if (localUpdateFromUp) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileUp.getPossibilities().forEach(m -> keys.add(m.keyDown));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForDownKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromRight) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileRight.getPossibilities().forEach(m -> keys.add(m.keyLeft));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForLeftKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromDown) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileDown.getPossibilities().forEach(m -> keys.add(m.keyUp));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForUpKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+        if (localUpdateFromLeft) {
+          HashSet<Integer> keys = new HashSet<>();
+          tileLeft.getPossibilities().forEach(m -> keys.add(m.keyRight));
+
+          HashSet<IntModule> comparePossibilities = new HashSet<>();
+          keys.forEach(k -> comparePossibilities.addAll(modulesForRightKey.get(k)));
+          changed = newPossibilities.retainAll(comparePossibilities) || changed;
+        }
+
+        if (changed) {
+          tile.setPossibilities(newPossibilities);
+          updateChanged();
+        }
+
+        if (threadCounter.decrementAndGet() == 0) {
+          collapseUntillUpdates();
+        }
       }
     }
-
 
     public Tile getTile() {
       return tile;
