@@ -1,159 +1,224 @@
 package nl.basmens.wfc;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import cern.colt.list.IntArrayList;
 import nl.benmens.processing.PApplet;
 
-public final class Wfc {
+public final class Wfc implements Runnable {
+  private static final int MAX_RECURSION = 500;
+
   private int gridW;
   private int gridH;
-  private WfcFeatures wfcFeatures;
   private Tile[][] grid;
+  private boolean loopEdgesEnabledX;
+  private boolean loopEdgesEnabledY;
 
-  private ExecutorService executorService;
-  private TileUpdater[][] tileUpdaters;
-  private AtomicInteger threadCounter;
-  private boolean isRunning;
+  private Module[] modules;
+  private PossibilitySet[] possibleModulesUp;
+  private PossibilitySet[] possibleModulesRight;
+  private PossibilitySet[] possibleModulesDown;
+  private PossibilitySet[] possibleModulesLeft;
 
-  private ArrayList<IntModule> intModules;
-  private ArrayList<HashSet<IntModule>> modulesForUpKey;
-  private ArrayList<HashSet<IntModule>> modulesForRightKey;
-  private ArrayList<HashSet<IntModule>> modulesForDownKey;
-  private ArrayList<HashSet<IntModule>> modulesForLeftKey;
+  private IntArrayList[] entropyLists;
+  private int[][] locationInEntropyList;
+  private boolean running;
+
+  private IntArrayList stackX = new IntArrayList();
+  private IntArrayList stackY = new IntArrayList();
+  private ArrayList<Direction> stackDirection = new ArrayList<>();
 
   private Random random = new Random();
-  private LinkedListElement[] entropyLists;
+
+  private enum Direction {
+    UP,
+    RIGHT,
+    DOWN,
+    LEFT
+  }
 
   // ===================================================================================================================
   // Constructor
   // ===================================================================================================================
-  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures, int threadCount) {
+  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures) {
     this.gridW = gridW;
     this.gridH = gridH;
-    setWfcFeatures(wfcFeatures);
-    this.executorService = Executors.newFixedThreadPool(threadCount);
-    threadCounter = new AtomicInteger();
 
-    createGrid();
+    setWfcFeatures(wfcFeatures);
   }
 
   // ===================================================================================================================
   // Functionality
   // ===================================================================================================================
-  public void createGrid() {
-    if (isRunning) {
-      return;
+  public void run() {
+    running = true;
+
+    // Create entropy lists
+    entropyLists = new IntArrayList[modules.length - 1];
+    for (int i = 0; i < modules.length - 1; i++) {
+      entropyLists[i] = new IntArrayList();
     }
 
-    entropyLists = new LinkedListElement[intModules.size() - 1];
-
-    // Create the grid and manage relations
+    // Create the grid
     grid = new Tile[gridW][gridH];
-    tileUpdaters = new TileUpdater[gridW][gridH];
+    locationInEntropyList = new int[gridW][gridH];
+    IntArrayList maxEntropyList = entropyLists[modules.length - 2];
+    
     for (int x = 0; x < gridW; x++) {
       for (int y = 0; y < gridH; y++) {
-        grid[x][y] = new Tile(intModules);
-        tileUpdaters[x][y] = new TileUpdater(grid[x][y]);
-
-        if (x > 0) {
-          TileUpdater left = tileUpdaters[x - 1][y];
-          tileUpdaters[x][y].setNeighbourLeft(grid[x - 1][y], left);
-          left.setNeighbourRight(grid[x][y], tileUpdaters[x][y]);
-        }
-        if (y > 0) {
-          TileUpdater up = tileUpdaters[x][y - 1];
-          tileUpdaters[x][y].setNeighbourUp(grid[x][y - 1], up);
-          up.setNeighbourDown(grid[x][y], tileUpdaters[x][y]);
-        }
+        grid[x][y] = new Tile(new PossibilitySet(modules.length, true));
+        locationInEntropyList[x][y] = maxEntropyList.size();
+        maxEntropyList.add(x * gridH + y);
       }
     }
 
-    // Manage relations looping over the edge
-    boolean loop = wfcFeatures.isLoopEdgesEnabled();
     for (int x = 0; x < gridW; x++) {
-      TileUpdater top = tileUpdaters[x][0];
-      TileUpdater bottom = tileUpdaters[x][gridH - 1];
-      Tile topTile = (loop) ? grid[x][0] : null;
-      Tile bottomTile = (loop) ? grid[x][gridH - 1] : null;
-
-      top.setNeighbourUp(bottomTile, bottom);
-      bottom.setNeighbourDown(topTile, top);
+      for (int y = 0; y < gridH; y++) {
+        updateTile(x, y, Direction.UP, 0);
+        updateTile(x, y, Direction.RIGHT, 0);
+        updateTile(x, y, Direction.DOWN, 0);
+        updateTile(x, y, Direction.LEFT, 0);
+      }
     }
-    for (int y = 0; y < gridH; y++) {
-      TileUpdater left = tileUpdaters[0][y];
-      TileUpdater right = tileUpdaters[gridW - 1][y];
-      Tile leftTile = (loop) ? grid[0][y] : null;
-      Tile rightTile = (loop) ? grid[gridW - 1][y] : null;
-
-      left.setNeighbourLeft(rightTile, right);
-      right.setNeighbourRight(leftTile, left);
+    
+    while (running) {
+      while (stackX.size() > 0) {
+        updateTile(stackX.get(0), stackY.get(0), stackDirection.get(0), 0);
+        stackX.remove(0);
+        stackY.remove(0);
+        stackDirection.remove(0);
+      }
+      collapseTile();
     }
   }
 
-  public void start() {
-    if (isRunning) {
+  public void updateTile(int x, int y, Direction direction, int recursion) {
+    x = (x + gridW) % gridW;
+    y = (y + gridH) % gridH;
+    Tile tile = grid[x][y];
+    int startEntropy = tile.getEntropy();
+
+    if (startEntropy <= 1) {
       return;
     }
 
-    isRunning = true;
+    if ((direction == Direction.UP) && (y > 0 || loopEdgesEnabledY)) {
+      Tile t = grid[x][(y + gridH - 1) % gridH];
+      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+        possibilities.unionWith(possibleModulesDown[i]);
+      }
+      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+    }
+    if ((direction == Direction.RIGHT) && (x > 0 || loopEdgesEnabledX)) {
+      Tile t = grid[(x + 1) % gridW][y];
+      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+        possibilities.unionWith(possibleModulesLeft[i]);
+      }
+      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+    }
+    if ((direction == Direction.DOWN) && (y < gridH - 1 || loopEdgesEnabledY)) {
+      Tile t = grid[x][(y + 1) % gridH];
+      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+        possibilities.unionWith(possibleModulesUp[i]);
+      }
+      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+    }
+    if ((direction == Direction.LEFT) && (x < gridW - 1 || loopEdgesEnabledX)) {
+      Tile t = grid[(x + gridW - 1) % gridW][y];
+      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+        possibilities.unionWith(possibleModulesRight[i]);
+      }
+      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+    }
 
-    for (int x = 0; x < gridW; x++) {
-      for (int y = 0; y < gridH; y++) {
-        TileUpdater tileUpdater = tileUpdaters[x][y];
-        tileUpdater.updateFromUp();
-        tileUpdater.updateFromRight();
-        tileUpdater.updateFromDown();
-        tileUpdater.updateFromLeft();
+    if (tile.getEntropy() < startEntropy) {
+      moveBetweenEntropyLists(x, y, startEntropy, tile.getEntropy());
+
+      if (recursion > MAX_RECURSION) {
+        if (direction != Direction.UP) {
+          stackX.add(x);
+          stackY.add(y - 1);
+          stackDirection.add(Direction.DOWN);
+        }
+        if (direction != Direction.RIGHT) {
+          stackX.add(x + 1);
+          stackY.add(y);
+          stackDirection.add(Direction.LEFT);
+        }
+        if (direction != Direction.DOWN) {
+          stackX.add(x);
+          stackY.add(y + 1);
+          stackDirection.add(Direction.UP);
+        }
+        if (direction != Direction.LEFT) {
+          stackX.add(x - 1);
+          stackY.add(y);
+          stackDirection.add(Direction.RIGHT);
+        }
+      } else {
+        if (direction != Direction.UP) {
+          updateTile(x, y - 1, Direction.DOWN, recursion + 1);
+        }
+        if (direction != Direction.RIGHT) {
+          updateTile(x + 1, y, Direction.LEFT, recursion + 1);
+        }
+        if (direction != Direction.DOWN) {
+          updateTile(x, y + 1, Direction.UP, recursion + 1);
+        }
+        if (direction != Direction.LEFT) {
+          updateTile(x - 1, y, Direction.RIGHT, recursion + 1);
+        }
       }
     }
   }
 
   public void collapseTile(int x, int y) {
-    collapseTile(tileUpdaters[x][y]);
-  }
-
-  public void collapseTile(TileUpdater tileUpdater) {
-    Tile tile = tileUpdater.getTile();
-    IntModule intModule = tile.getPossibilities()
-        .toArray(IntModule[]::new)[random.nextInt(0, tile.getPossibilities().size())];
-    tile.colapse(intModule);
-
-    tileUpdater.updateChanged();
+    Tile tile = grid[x][y];
+    if (!tile.isCollapsed()) {
+      int[] possibilities = tile.getPossibilitiesSet().getPossibilities();
+      moveBetweenEntropyLists(x, y, tile.getEntropy(), 1);
+      tile.colapse(possibilities[random.nextInt(possibilities.length)]);
+  
+      updateTile(x, y + 1, Direction.UP, 0);
+      updateTile(x - 1, y, Direction.RIGHT, 0);
+      updateTile(x, y - 1, Direction.DOWN, 0);
+      updateTile(x + 1, y, Direction.LEFT, 0);
+    }
   }
 
   public void collapseTile() {
-    int entropy;
-    LinkedListElement next = null;
-    for (entropy = 0; entropy < entropyLists.length; entropy++) {
-      next = entropyLists[entropy];
-      while (next != null && next.tileUpdater == null) {
-        next = next.next;
-        entropyLists[entropy] = next;
-      }
-
-      if (next != null) {
-        entropyLists[entropy] = next.next;
-        break;
+    int entropy = 0;
+    while (entropyLists[entropy].size() == 0) {
+      entropy++;
+      if (entropy == entropyLists.length) {
+        running = false;
+        return;
       }
     }
 
-    if (next == null) {
-      isRunning = false;
-      return;
+    IntArrayList entropyList = entropyLists[entropy];
+    int tileToCollapse = entropyList.get(random.nextInt(entropyList.size()));
+    collapseTile(tileToCollapse / gridH, tileToCollapse % gridH);
+  }
+
+  private void moveBetweenEntropyLists(int x, int y, int oldEntropy, int newEntropy) {
+    IntArrayList oldList = entropyLists[oldEntropy - 2];
+    int lastValue = oldList.get(oldList.size() - 1);
+    locationInEntropyList[lastValue / gridH][lastValue % gridH] = locationInEntropyList[x][y];
+
+    oldList.set(locationInEntropyList[x][y], lastValue);
+    oldList.remove(oldList.size() - 1);
+
+    newEntropy -= 2;
+    if (newEntropy >= 0) {
+      locationInEntropyList[x][y] = entropyLists[newEntropy].size();
+      entropyLists[newEntropy].add(x * gridH + y);
     }
-
-    // int randomDepth = random.nextInt(tileCount);
-    // LinkedListElement element = entropyLists[entropy];
-    // for (int i = 0; i < randomDepth; i++) {
-    // element = element.next;
-    // }
-
-    collapseTile(next.tileUpdater);
   }
 
   // ===================================================================================================================
@@ -168,243 +233,27 @@ public final class Wfc {
   }
 
   public Tile[][] getGrid() {
-    return grid;
+    if (grid == null) {
+      return new Tile[0][0];
+    }
+    return grid.clone();
+  }
+
+  public Module getModule(int index) {
+    return modules[index];
   }
 
   public boolean isRunning() {
-    return isRunning;
+    return running;
   }
 
   public void setWfcFeatures(WfcFeatures wfcFeatures) {
-    if (isRunning) {
-      return;
-    }
-
-    this.wfcFeatures = wfcFeatures;
-
-    intModules = new ArrayList<>(wfcFeatures.getIntModules());
-    modulesForUpKey = new ArrayList<>(wfcFeatures.getModulesForUpKey());
-    modulesForRightKey = new ArrayList<>(wfcFeatures.getModulesForRightKey());
-    modulesForDownKey = new ArrayList<>(wfcFeatures.getModulesForDownKey());
-    modulesForLeftKey = new ArrayList<>(wfcFeatures.getModulesForLeftKey());
-  }
-
-  // ===================================================================================================================
-  // LickedList
-  // ===================================================================================================================
-  private class LinkedListElement {
-    public LinkedListElement next;
-    public TileUpdater tileUpdater;
-
-    public LinkedListElement(LinkedListElement next, TileUpdater tileUpdater) {
-      this.next = next;
-      this.tileUpdater = tileUpdater;
-    }
-  }
-
-  // ===================================================================================================================
-  // TileUpdater
-  // ===================================================================================================================
-  private class TileUpdater implements Runnable {
-    private boolean updateFromUp;
-    private boolean updateFromRight;
-    private boolean updateFromDown;
-    private boolean updateFromLeft;
-    private boolean submitted;
-    private Object runningMonitor = new Object();
-
-    private final Tile tile;
-    private Tile tileUp;
-    private Tile tileRight;
-    private Tile tileDown;
-    private Tile tileLeft;
-    private TileUpdater updaterUp;
-    private TileUpdater updaterRight;
-    private TileUpdater updaterDown;
-    private TileUpdater updaterLeft;
-
-    private LinkedListElement linkedListElement;
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // Creation
-    // -----------------------------------------------------------------------------------------------------------------
-    public TileUpdater(Tile tile) {
-      this.tile = tile;
-
-      prefixNewEntropyListElement();
-    }
-
-    public void setNeighbourUp(Tile tileUp, TileUpdater updaterUp) {
-      this.tileUp = tileUp;
-      this.updaterUp = updaterUp;
-    }
-
-    public void setNeighbourRight(Tile tileRight, TileUpdater updaterRight) {
-      this.tileRight = tileRight;
-      this.updaterRight = updaterRight;
-    }
-
-    public void setNeighbourDown(Tile tileDown, TileUpdater updaterDown) {
-      this.tileDown = tileDown;
-      this.updaterDown = updaterDown;
-    }
-
-    public void setNeighbourLeft(Tile tileLeft, TileUpdater updaterLeft) {
-      this.tileLeft = tileLeft;
-      this.updaterLeft = updaterLeft;
-    }
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // Entropy list
-    // -----------------------------------------------------------------------------------------------------------------
-    private void prefixNewEntropyListElement() {
-      synchronized (entropyLists) {
-        linkedListElement = new LinkedListElement(entropyLists[tile.getEntropy() - 2], this);
-        entropyLists[tile.getEntropy() - 2] = linkedListElement;
-      }
-    }
-
-    private void updateEntropyInList() {
-      linkedListElement.tileUpdater = null;
-
-      if (tile.getEntropy() == 0) {
-        isRunning = false;
-        executorService.shutdown();
-        // PApplet.println("No solution");
-        return;
-      }
-
-      if (!tile.isCollapsed()) {
-        prefixNewEntropyListElement();
-      }
-    }
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // Queueing
-    // -----------------------------------------------------------------------------------------------------------------
-    public synchronized void updateFromUp() {
-      if (tileUp != null) {
-        updateFromUp = true;
-        submit();
-      }
-    }
-
-    public synchronized void updateFromRight() {
-      if (tileRight != null) {
-        updateFromRight = true;
-        submit();
-      }
-    }
-
-    public synchronized void updateFromDown() {
-      if (tileDown != null) {
-        updateFromDown = true;
-        submit();
-      }
-    }
-
-    public synchronized void updateFromLeft() {
-      if (tileLeft != null) {
-        updateFromLeft = true;
-        submit();
-      }
-    }
-
-    private void submit() {
-      if (!submitted && !tile.isCollapsed()) {
-        threadCounter.incrementAndGet();
-        executorService.submit(this);
-      }
-      submitted = true;
-    }
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // Evaluating
-    // -----------------------------------------------------------------------------------------------------------------
-    public void updateChanged() {
-      updaterUp.updateFromDown();
-      updaterRight.updateFromLeft();
-      updaterDown.updateFromUp();
-      updaterLeft.updateFromRight();
-
-      updateEntropyInList();
-    }
-
-    private void collapseUntillUpdates() {
-      while (threadCounter.get() == 0 && isRunning) {
-        collapseTile();
-      }
-    }
-
-    @Override
-    public void run() {
-      synchronized (runningMonitor) {
-        // Syncronize the update variables
-        boolean localUpdateFromUp;
-        boolean localUpdateFromRight;
-        boolean localUpdateFromDown;
-        boolean localUpdateFromLeft;
-        synchronized (this) {
-          localUpdateFromUp = updateFromUp;
-          localUpdateFromRight = updateFromRight;
-          localUpdateFromDown = updateFromDown;
-          localUpdateFromLeft = updateFromLeft;
-          updateFromUp = false;
-          updateFromRight = false;
-          updateFromDown = false;
-          updateFromLeft = false;
-          submitted = false;
-        }
-
-        // Do the computing
-        boolean changed = false;
-        HashSet<IntModule> newPossibilities = tile.getPossibilities();
-        if (localUpdateFromUp) {
-          HashSet<Integer> keys = new HashSet<>();
-          tileUp.getPossibilities().forEach(m -> keys.add(m.keyDown));
-
-          HashSet<IntModule> comparePossibilities = new HashSet<>();
-          keys.forEach(k -> comparePossibilities.addAll(modulesForDownKey.get(k)));
-          changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        }
-        if (localUpdateFromRight) {
-          HashSet<Integer> keys = new HashSet<>();
-          tileRight.getPossibilities().forEach(m -> keys.add(m.keyLeft));
-
-          HashSet<IntModule> comparePossibilities = new HashSet<>();
-          keys.forEach(k -> comparePossibilities.addAll(modulesForLeftKey.get(k)));
-          changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        }
-        if (localUpdateFromDown) {
-          HashSet<Integer> keys = new HashSet<>();
-          tileDown.getPossibilities().forEach(m -> keys.add(m.keyUp));
-
-          HashSet<IntModule> comparePossibilities = new HashSet<>();
-          keys.forEach(k -> comparePossibilities.addAll(modulesForUpKey.get(k)));
-          changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        }
-        if (localUpdateFromLeft) {
-          HashSet<Integer> keys = new HashSet<>();
-          tileLeft.getPossibilities().forEach(m -> keys.add(m.keyRight));
-
-          HashSet<IntModule> comparePossibilities = new HashSet<>();
-          keys.forEach(k -> comparePossibilities.addAll(modulesForRightKey.get(k)));
-          changed = newPossibilities.retainAll(comparePossibilities) || changed;
-        }
-
-        if (changed) {
-          tile.setPossibilities(newPossibilities);
-          updateChanged();
-        }
-
-        if (threadCounter.decrementAndGet() == 0) {
-          collapseUntillUpdates();
-        }
-      }
-    }
-
-    public Tile getTile() {
-      return tile;
-    }
+    modules = wfcFeatures.getModules();
+    possibleModulesUp = wfcFeatures.getPossibleModulesUp();
+    possibleModulesRight = wfcFeatures.getPossibleModulesRight();
+    possibleModulesDown = wfcFeatures.getPossibleModulesDown();
+    possibleModulesLeft = wfcFeatures.getPossibleModulesLeft();
+    loopEdgesEnabledX = wfcFeatures.isLoopEdgesEnabledX();
+    loopEdgesEnabledY = wfcFeatures.isLoopEdgesEnabledY();
   }
 }

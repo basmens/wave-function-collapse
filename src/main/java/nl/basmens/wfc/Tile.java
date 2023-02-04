@@ -1,46 +1,58 @@
 package nl.basmens.wfc;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 public final class Tile {
-  private HashSet<IntModule> possibilities = new HashSet<>();
+  private PossibilitySet possibilities;
+  private int collapsedPossibility;
+  private int entropy;
 
-  public Tile(List<IntModule> initialPossibilities) {
-    possibilities.addAll(initialPossibilities);
+  public Tile(PossibilitySet initialPossibilities) {
+    setPossibilities(initialPossibilities);
   }
 
   public synchronized boolean isCollapsed() {
-    return possibilities.size() == 1;
+    return entropy == 1;
   }
 
   public synchronized int getEntropy() {
-    return possibilities.size();
+    return entropy;
   }
 
-  public synchronized IntModule getModule() {
+  public synchronized int getCollapsedModule() {
     if (isCollapsed()) {
-      return possibilities.toArray(new IntModule[]{})[0];
+      return collapsedPossibility;
     }
-    return null;
+    return -1;
   }
 
-  @SuppressWarnings("unchecked")
-  public synchronized HashSet<IntModule> getPossibilities() {
-    return (HashSet<IntModule>) possibilities.clone();
+  public synchronized PossibilitySet getPossibilitiesSet() {
+    return new PossibilitySet(possibilities);
   }
 
-  public synchronized void setPossibilities(Set<IntModule> possibilities) {
-    if (!isCollapsed()) {
-      this.possibilities = new HashSet<>(possibilities);
+  public synchronized void setPossibilities(PossibilitySet possibilities) {
+    this.possibilities = new PossibilitySet(possibilities);
+
+    entropy = possibilities.getEntropy();
+
+    if (entropy == 1) {
+      long[] values = possibilities.getPossibilitiesArray();
+      for (int i = 0; i < values.length; i++) {
+        if (values[i] != 0) {
+          collapsedPossibility = 0;
+          while (values[i] >>> collapsedPossibility != 1) {
+            collapsedPossibility++;
+          }
+        }
+      }
     }
   }
 
-  public synchronized void colapse(IntModule intModule) {
+  public synchronized void colapse(int module) {
     if (!isCollapsed()) {
-      possibilities = new HashSet<>();
-      possibilities.add(intModule);
+      possibilities = new PossibilitySet(possibilities.getPossibilitiesCount(), false);
+      possibilities.addPossibility(module);
+
+      entropy = 1;
+      collapsedPossibility = module;
     }
   }
 }
