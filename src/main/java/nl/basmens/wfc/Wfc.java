@@ -6,7 +6,7 @@ import java.util.Random;
 import cern.colt.list.IntArrayList;
 
 public final class Wfc implements Runnable {
-  private static final int MAX_RECURSION = 500;
+  private static final int MAX_RECURSION = 800;
 
   private int gridW;
   private int gridH;
