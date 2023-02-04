@@ -26,34 +26,30 @@ public class WfcFeatures {
         .flatMap(m -> Arrays.stream(m.rotations).mapToObj(r -> rotateModule(m, r)))
         .toArray(Module[]::new);
 
-    // Create possibleModules* arrays and track modulesWith*Key
+    // Track modulesWith*Key
     int keysCount = possibleKeys.size();
     int moduleCount = this.modules.length;
     HashMap<String, PossibilitySet> modulesWithUpKey = new HashMap<>(keysCount);
     HashMap<String, PossibilitySet> modulesWithRightKey = new HashMap<>(keysCount);
     HashMap<String, PossibilitySet> modulesWithDownKey = new HashMap<>(keysCount);
     HashMap<String, PossibilitySet> modulesWithLeftKey = new HashMap<>(keysCount);
+    for (int i = 0; i < moduleCount; i++) {
+      Module module = this.modules[i];
+      modulesWithUpKey.computeIfAbsent(module.keyUp, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithRightKey.computeIfAbsent(module.keyRight, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithDownKey.computeIfAbsent(module.keyDown, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithLeftKey.computeIfAbsent(module.keyLeft, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+    }
+    
+    // Fill possibleModules* arrays
     possibleModulesUp = new PossibilitySet[moduleCount];
     possibleModulesRight = new PossibilitySet[moduleCount];
     possibleModulesDown = new PossibilitySet[moduleCount];
     possibleModulesLeft = new PossibilitySet[moduleCount];
-    for (int i = 0; i < moduleCount; i++) {
-      possibleModulesUp[i] = new PossibilitySet(moduleCount, false);
-      possibleModulesRight[i] = new PossibilitySet(moduleCount, false);
-      possibleModulesDown[i] = new PossibilitySet(moduleCount, false);
-      possibleModulesLeft[i] = new PossibilitySet(moduleCount, false);
-
-      modulesWithUpKey.computeIfAbsent(this.modules[i].keyUp, x -> new PossibilitySet(moduleCount, false))
-          .addPossibility(i);
-      modulesWithRightKey.computeIfAbsent(this.modules[i].keyRight, x -> new PossibilitySet(moduleCount, false))
-          .addPossibility(i);
-      modulesWithDownKey.computeIfAbsent(this.modules[i].keyDown, x -> new PossibilitySet(moduleCount, false))
-          .addPossibility(i);
-      modulesWithLeftKey.computeIfAbsent(this.modules[i].keyLeft, x -> new PossibilitySet(moduleCount, false))
-          .addPossibility(i);
-    }
-
-    // Fill possibleModules* arrays
     for (int i = 0; i < moduleCount; i++) {
       Module module = this.modules[i];
       Set<String> possibleKeysUp = keyPairMap.getPairs(module.keyUp);

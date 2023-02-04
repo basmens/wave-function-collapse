@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import cern.colt.list.IntArrayList;
-import nl.benmens.processing.PApplet;
 
 public final class Wfc implements Runnable {
   private static final int MAX_RECURSION = 500;
 
   private int gridW;
   private int gridH;
-  private Tile[][] grid;
+  private PossibilitySet[][] grid;
   private boolean loopEdgesEnabledX;
   private boolean loopEdgesEnabledY;
 
@@ -61,15 +60,17 @@ public final class Wfc implements Runnable {
     }
 
     // Create the grid
-    grid = new Tile[gridW][gridH];
-    locationInEntropyList = new int[gridW][gridH];
-    IntArrayList maxEntropyList = entropyLists[modules.length - 2];
-    
-    for (int x = 0; x < gridW; x++) {
-      for (int y = 0; y < gridH; y++) {
-        grid[x][y] = new Tile(new PossibilitySet(modules.length, true));
-        locationInEntropyList[x][y] = maxEntropyList.size();
-        maxEntropyList.add(x * gridH + y);
+    synchronized (this) {
+      grid = new PossibilitySet[gridW][gridH];
+      locationInEntropyList = new int[gridW][gridH];
+      IntArrayList maxEntropyList = entropyLists[modules.length - 2];
+      
+      for (int x = 0; x < gridW; x++) {
+        for (int y = 0; y < gridH; y++) {
+          grid[x][y] = new PossibilitySet(modules.length, true);
+          locationInEntropyList[x][y] = maxEntropyList.size();
+          maxEntropyList.add(x * gridH + y);
+        }
       }
     }
 
@@ -96,7 +97,7 @@ public final class Wfc implements Runnable {
   public void updateTile(int x, int y, Direction direction, int recursion) {
     x = (x + gridW) % gridW;
     y = (y + gridH) % gridH;
-    Tile tile = grid[x][y];
+    PossibilitySet tile = grid[x][y];
     int startEntropy = tile.getEntropy();
 
     if (startEntropy <= 1) {
@@ -104,36 +105,32 @@ public final class Wfc implements Runnable {
     }
 
     if ((direction == Direction.UP) && (y > 0 || loopEdgesEnabledY)) {
-      Tile t = grid[x][(y + gridH - 1) % gridH];
       PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+      for (int i : grid[x][(y + gridH - 1) % gridH].getPossibilities()) {
         possibilities.unionWith(possibleModulesDown[i]);
       }
-      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+      tile.intersectionWith(possibilities);
     }
     if ((direction == Direction.RIGHT) && (x > 0 || loopEdgesEnabledX)) {
-      Tile t = grid[(x + 1) % gridW][y];
       PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+      for (int i : grid[(x + 1) % gridW][y].getPossibilities()) {
         possibilities.unionWith(possibleModulesLeft[i]);
       }
-      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+      tile.intersectionWith(possibilities);
     }
     if ((direction == Direction.DOWN) && (y < gridH - 1 || loopEdgesEnabledY)) {
-      Tile t = grid[x][(y + 1) % gridH];
       PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+      for (int i : grid[x][(y + 1) % gridH].getPossibilities()) {
         possibilities.unionWith(possibleModulesUp[i]);
       }
-      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+      tile.intersectionWith(possibilities);
     }
     if ((direction == Direction.LEFT) && (x < gridW - 1 || loopEdgesEnabledX)) {
-      Tile t = grid[(x + gridW - 1) % gridW][y];
       PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : t.getPossibilitiesSet().getPossibilities()) {
+      for (int i : grid[(x + gridW - 1) % gridW][y].getPossibilities()) {
         possibilities.unionWith(possibleModulesRight[i]);
       }
-      tile.setPossibilities(tile.getPossibilitiesSet().intersectionWith(possibilities));
+      tile.intersectionWith(possibilities);
     }
 
     if (tile.getEntropy() < startEntropy) {
@@ -178,17 +175,16 @@ public final class Wfc implements Runnable {
   }
 
   public void collapseTile(int x, int y) {
-    Tile tile = grid[x][y];
-    if (!tile.isCollapsed()) {
-      int[] possibilities = tile.getPossibilitiesSet().getPossibilities();
-      moveBetweenEntropyLists(x, y, tile.getEntropy(), 1);
-      tile.colapse(possibilities[random.nextInt(possibilities.length)]);
-  
-      updateTile(x, y + 1, Direction.UP, 0);
-      updateTile(x - 1, y, Direction.RIGHT, 0);
-      updateTile(x, y - 1, Direction.DOWN, 0);
-      updateTile(x + 1, y, Direction.LEFT, 0);
-    }
+    PossibilitySet tile = grid[x][y];
+    
+    int[] possibilities = tile.getPossibilities();
+    moveBetweenEntropyLists(x, y, tile.getEntropy(), 1);
+    tile.collapse(possibilities[random.nextInt(possibilities.length)]);
+
+    updateTile(x, y + 1, Direction.UP, 0);
+    updateTile(x - 1, y, Direction.RIGHT, 0);
+    updateTile(x, y - 1, Direction.DOWN, 0);
+    updateTile(x + 1, y, Direction.LEFT, 0);
   }
 
   public void collapseTile() {
@@ -232,9 +228,9 @@ public final class Wfc implements Runnable {
     return gridH;
   }
 
-  public Tile[][] getGrid() {
+  public synchronized PossibilitySet[][] getGrid() {
     if (grid == null) {
-      return new Tile[0][0];
+      return new PossibilitySet[0][0];
     }
     return grid.clone();
   }

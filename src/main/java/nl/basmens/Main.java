@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 import nl.basmens.wfc.KeyPairsMap;
-import nl.basmens.wfc.Tile;
+import nl.basmens.wfc.PossibilitySet;
 import nl.basmens.wfc.Wfc;
 import nl.basmens.wfc.WfcFeatures;
 import nl.benmens.processing.PApplet;
@@ -116,30 +116,24 @@ public class Main extends PApplet {
     startWfc();
   }
 
-  private int startTime;
-  private ArrayList<Integer> times = new ArrayList<>();
-
   private void startWfc() {
-    startTime = millis();
-
     wfc = new Wfc(100, 50, features);
     Thread thread = new Thread(wfc);
     thread.start();
   }
-
+  
+  private ArrayList<Double> times = new ArrayList<>();
   @Override
   public void draw() {
     background(0);
 
-    // if (!wfc.isRunning()) {
-    //   int timeElapsed = millis() - startTime;
-    //   times.add(timeElapsed);
-
-    //   double average = times.stream().mapToInt(x -> x).sum() / (double) times.size();
-    //   println(timeElapsed + " - " + String.format(Locale.ENGLISH, "%.2f", average) + " - " + times.size());
-
-    //   startWfc();
-    // }
+    long startTime = System.nanoTime();
+    wfc = new Wfc(100, 50, features);
+    wfc.run();
+    double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
+    times.add(timeElapsed);
+    double average = times.stream().mapToDouble(x -> x).sum() / times.size();
+    println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
 
     // Draw grid
     stroke(50);
@@ -155,11 +149,11 @@ public class Main extends PApplet {
 
     // Draw tiles
     imageMode(CENTER);
-    Tile[][] grid = wfc.getGrid();
+    PossibilitySet[][] grid = wfc.getGrid();
     for (int x = 0; x < grid.length; x++) {
       for (int y = 0; y < grid[0].length; y++) {
         if (grid[x][y].isCollapsed()) {
-          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getCollapsedModule());
+          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilities()[0]);
           if (module.getChildItem() instanceof PImage img) {
             pushMatrix();
             translate((float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
