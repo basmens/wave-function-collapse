@@ -113,14 +113,14 @@ public class Main extends PApplet {
     features.setLoopEdgesEnabledX(true);
     features.setLoopEdgesEnabledY(true);
 
-    startWfc();
+    // startWfc();
   }
 
-  private void startWfc() {
-    wfc = new Wfc(100, 50, features);
-    Thread thread = new Thread(wfc);
-    thread.start();
-  }
+  // private void startWfc() {
+  //   wfc = new Wfc(100, 50, features);
+  //   Thread thread = new Thread(wfc);
+  //   thread.start();
+  // }
   
   private ArrayList<Double> times = new ArrayList<>();
   @Override
@@ -192,7 +192,7 @@ public class Main extends PApplet {
 
       wfc.collapseTile(x, y);
     } else {
-      startWfc();
+      // startWfc();
       // println(wfc.isRunning());
     }
   }
@@ -202,7 +202,7 @@ public class Main extends PApplet {
     // save("C:/Users/basme/Downloads/wfc result.png");
     // times = new ArrayList<>();
     // threadCount = 1;
-    startWfc();
+    // startWfc();
   }
 
   // ===================================================================================================================

@@ -1,13 +1,11 @@
 package nl.basmens.wfc;
 
-import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Random;
 
 import cern.colt.list.IntArrayList;
 
 public final class Wfc implements Runnable {
-  private static final int MAX_RECURSION = 500;
-
   private int gridW;
   private int gridH;
   private PossibilitySet[][] grid;
@@ -24,9 +22,7 @@ public final class Wfc implements Runnable {
   private int[][] locationInEntropyList;
   private boolean running;
 
-  private IntArrayList stackX = new IntArrayList();
-  private IntArrayList stackY = new IntArrayList();
-  private ArrayList<Direction> stackDirection = new ArrayList<>();
+  private ArrayDeque<QueueElm> stack = new ArrayDeque<QueueElm>(20000);
 
   private Random random = new Random();
 
@@ -35,6 +31,9 @@ public final class Wfc implements Runnable {
     RIGHT,
     DOWN,
     LEFT
+  }
+
+  record QueueElm(int x, int y, Direction direction) {
   }
 
   // ===================================================================================================================
@@ -64,7 +63,7 @@ public final class Wfc implements Runnable {
       grid = new PossibilitySet[gridW][gridH];
       locationInEntropyList = new int[gridW][gridH];
       IntArrayList maxEntropyList = entropyLists[modules.length - 2];
-      
+
       for (int x = 0; x < gridW; x++) {
         for (int y = 0; y < gridH; y++) {
           grid[x][y] = new PossibilitySet(modules.length, true);
@@ -76,25 +75,23 @@ public final class Wfc implements Runnable {
 
     for (int x = 0; x < gridW; x++) {
       for (int y = 0; y < gridH; y++) {
-        updateTile(x, y, Direction.UP, 0);
-        updateTile(x, y, Direction.RIGHT, 0);
-        updateTile(x, y, Direction.DOWN, 0);
-        updateTile(x, y, Direction.LEFT, 0);
+        updateTile(x, y, Direction.UP);
+        updateTile(x, y, Direction.RIGHT);
+        updateTile(x, y, Direction.DOWN);
+        updateTile(x, y, Direction.LEFT);
       }
     }
-    
+
     while (running) {
-      while (stackX.size() > 0) {
-        updateTile(stackX.get(0), stackY.get(0), stackDirection.get(0), 0);
-        stackX.remove(0);
-        stackY.remove(0);
-        stackDirection.remove(0);
+      while (!stack.isEmpty()) {
+        QueueElm qe = stack.pop();
+        updateTile(qe.x, qe.y, qe.direction);
       }
       collapseTile();
     }
   }
 
-  public void updateTile(int x, int y, Direction direction, int recursion) {
+  public void updateTile(int x, int y, Direction direction) {
     x = (x + gridW) % gridW;
     y = (y + gridH) % gridH;
     PossibilitySet tile = grid[x][y];
@@ -104,87 +101,84 @@ public final class Wfc implements Runnable {
       return;
     }
 
-    if ((direction == Direction.UP) && (y > 0 || loopEdgesEnabledY)) {
-      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : grid[x][(y + gridH - 1) % gridH].getPossibilities()) {
-        possibilities.unionWith(possibleModulesDown[i]);
-      }
-      tile.intersectionWith(possibilities);
-    }
-    if ((direction == Direction.RIGHT) && (x > 0 || loopEdgesEnabledX)) {
-      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : grid[(x + 1) % gridW][y].getPossibilities()) {
-        possibilities.unionWith(possibleModulesLeft[i]);
-      }
-      tile.intersectionWith(possibilities);
-    }
-    if ((direction == Direction.DOWN) && (y < gridH - 1 || loopEdgesEnabledY)) {
-      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : grid[x][(y + 1) % gridH].getPossibilities()) {
-        possibilities.unionWith(possibleModulesUp[i]);
-      }
-      tile.intersectionWith(possibilities);
-    }
-    if ((direction == Direction.LEFT) && (x < gridW - 1 || loopEdgesEnabledX)) {
-      PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-      for (int i : grid[(x + gridW - 1) % gridW][y].getPossibilities()) {
-        possibilities.unionWith(possibleModulesRight[i]);
-      }
-      tile.intersectionWith(possibilities);
+    switch (direction) {
+      case UP:
+        if (y > 0 || loopEdgesEnabledY) {
+          PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+          for (int i : grid[x][(y + gridH - 1) % gridH].getPossibilities()) {
+            possibilities.unionWith(possibleModulesDown[i]);
+          }
+          tile.intersectionWith(possibilities);
+        }
+        break;
+      case RIGHT:
+        if (x > 0 || loopEdgesEnabledX) {
+          PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+          for (int i : grid[(x + 1) % gridW][y].getPossibilities()) {
+            possibilities.unionWith(possibleModulesLeft[i]);
+          }
+          tile.intersectionWith(possibilities);
+        }
+        break;
+      case DOWN:
+        if (y < gridH - 1 || loopEdgesEnabledY) {
+          PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+          for (int i : grid[x][(y + 1) % gridH].getPossibilities()) {
+            possibilities.unionWith(possibleModulesUp[i]);
+          }
+          tile.intersectionWith(possibilities);
+        }
+        break;
+      case LEFT:
+        if (x < gridW - 1 || loopEdgesEnabledX) {
+          PossibilitySet possibilities = new PossibilitySet(modules.length, false);
+          for (int i : grid[(x + gridW - 1) % gridW][y].getPossibilities()) {
+            possibilities.unionWith(possibleModulesRight[i]);
+          }
+          tile.intersectionWith(possibilities);
+        }
+        break;
     }
 
     if (tile.getEntropy() < startEntropy) {
       moveBetweenEntropyLists(x, y, startEntropy, tile.getEntropy());
 
-      if (recursion > MAX_RECURSION) {
-        if (direction != Direction.UP) {
-          stackX.add(x);
-          stackY.add(y - 1);
-          stackDirection.add(Direction.DOWN);
-        }
-        if (direction != Direction.RIGHT) {
-          stackX.add(x + 1);
-          stackY.add(y);
-          stackDirection.add(Direction.LEFT);
-        }
-        if (direction != Direction.DOWN) {
-          stackX.add(x);
-          stackY.add(y + 1);
-          stackDirection.add(Direction.UP);
-        }
-        if (direction != Direction.LEFT) {
-          stackX.add(x - 1);
-          stackY.add(y);
-          stackDirection.add(Direction.RIGHT);
-        }
-      } else {
-        if (direction != Direction.UP) {
-          updateTile(x, y - 1, Direction.DOWN, recursion + 1);
-        }
-        if (direction != Direction.RIGHT) {
-          updateTile(x + 1, y, Direction.LEFT, recursion + 1);
-        }
-        if (direction != Direction.DOWN) {
-          updateTile(x, y + 1, Direction.UP, recursion + 1);
-        }
-        if (direction != Direction.LEFT) {
-          updateTile(x - 1, y, Direction.RIGHT, recursion + 1);
-        }
+      switch (direction) {
+        case UP:
+          stack.push(new QueueElm(x + 1, y, Direction.LEFT));
+          stack.push(new QueueElm(x, y + 1, Direction.UP));
+          stack.push(new QueueElm(x - 1, y, Direction.RIGHT));
+          break;
+        case DOWN:
+          stack.push(new QueueElm(x, y - 1, Direction.DOWN));
+          stack.push(new QueueElm(x + 1, y, Direction.LEFT));
+          stack.push(new QueueElm(x - 1, y, Direction.RIGHT));
+          break;
+        case LEFT:
+          stack.push(new QueueElm(x, y - 1, Direction.DOWN));
+          stack.push(new QueueElm(x + 1, y, Direction.LEFT));
+          stack.push(new QueueElm(x, y + 1, Direction.UP));
+          break;
+        case RIGHT:
+          stack.push(new QueueElm(x, y - 1, Direction.DOWN));
+          stack.push(new QueueElm(x, y + 1, Direction.UP));
+          stack.push(new QueueElm(x - 1, y, Direction.RIGHT));
+          break;
       }
     }
   }
 
   public void collapseTile(int x, int y) {
     PossibilitySet tile = grid[x][y];
-    
+
     int[] possibilities = tile.getPossibilities();
     moveBetweenEntropyLists(x, y, tile.getEntropy(), 1);
     tile.collapse(possibilities[random.nextInt(possibilities.length)]);
 
-    updateTile(x, y + 1, Direction.UP, 0);
-    updateTile(x - 1, y, Direction.RIGHT, 0);
-    updateTile(x, y - 1, Direction.DOWN, 0);
-    updateTile(x + 1, y, Direction.LEFT, 0);
+    updateTile(x, y + 1, Direction.UP);
+    updateTile(x - 1, y, Direction.RIGHT);
+    updateTile(x, y - 1, Direction.DOWN);
+    updateTile(x + 1, y, Direction.LEFT);
   }
 
   public void collapseTile() {
