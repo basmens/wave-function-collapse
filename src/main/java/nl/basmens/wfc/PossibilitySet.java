@@ -11,6 +11,9 @@ public final class PossibilitySet {
   private boolean isEntropyUpdated;
   private int entropy;
 
+  private boolean isPossibilitiesAsArrayUpdated;
+  private int[] possibilitiesAsArray;
+
   // ===================================================================================================================
   // Construction
   // ===================================================================================================================
@@ -29,7 +32,7 @@ public final class PossibilitySet {
   
   public PossibilitySet(PossibilitySet toClone) {
     this.possibilitiesCount = toClone.getPossibilitiesCount();
-    this.possibilitiesArray = toClone.getPossibilitiesArray();
+    this.possibilitiesArray = toClone.getPossibilitiesAsBinary();
     
     removeTrailingOnesLong = ALL_ONE >>> (64 - possibilitiesCount % 64);
   }
@@ -50,6 +53,27 @@ public final class PossibilitySet {
     isEntropyUpdated = true;
   }
 
+  public void calculatePossibilitiesAsArray() {
+    possibilitiesAsArray = new int[getEntropy()];
+    int index = 0;
+
+    if (possibilitiesAsArray.length > 0) {
+      for (int i = 0; i < possibilitiesArray.length; i++) {
+        long value = possibilitiesArray[i];
+  
+        for (int j = 0; j < 64; j++) {
+          if ((value & 1L) == 1) {
+            possibilitiesAsArray[index] = i * 64 + j;
+            index++;
+          }
+          value >>>= 1;
+        }
+      }
+    }
+
+    isPossibilitiesAsArrayUpdated = true;
+  }
+
   // ===================================================================================================================
   // Operations
   // ===================================================================================================================
@@ -59,6 +83,9 @@ public final class PossibilitySet {
     }
     possibilitiesArray[index / 64] = possibilitiesArray[index / 64] | (1L << (index % 64));
     entropy++;
+
+    isPossibilitiesAsArrayUpdated = false;
+
   }
 
   public void removePossibility(int index) {
@@ -67,10 +94,13 @@ public final class PossibilitySet {
     }
     possibilitiesArray[index / 64] = possibilitiesArray[index / 64] & ~(1L << (index % 64));
     entropy--;
+
+    isPossibilitiesAsArrayUpdated = false;
+
   }
 
   public PossibilitySet unionWith(PossibilitySet set) {
-    long[] values = set.getPossibilitiesArray();
+    long[] values = set.getPossibilitiesAsBinary();
 
     for (int i = 0; i <= Math.max(possibilitiesCount, set.getPossibilitiesCount()) / 64; i++) {
       possibilitiesArray[i] = possibilitiesArray[i] | values[i];
@@ -79,18 +109,20 @@ public final class PossibilitySet {
     int index = possibilitiesArray.length - 1;
     possibilitiesArray[index] = possibilitiesArray[index] & removeTrailingOnesLong;
     isEntropyUpdated = false;
+    isPossibilitiesAsArrayUpdated = false;
 
     return this;
   }
 
   public PossibilitySet intersectionWith(PossibilitySet set) {
-    long[] values = set.getPossibilitiesArray();
+    long[] values = set.getPossibilitiesAsBinary();
 
     for (int i = 0; i <= Math.max(possibilitiesCount, set.getPossibilitiesCount()) / 64; i++) {
       possibilitiesArray[i] = possibilitiesArray[i] & values[i];
     }
 
     isEntropyUpdated = false;
+    isPossibilitiesAsArrayUpdated = false;
     return this;
   }
 
@@ -101,6 +133,8 @@ public final class PossibilitySet {
     addPossibility(index);
     entropy = 1;
     isEntropyUpdated = true;
+    possibilitiesAsArray = new int[]{index};
+    isPossibilitiesAsArrayUpdated = true;
   }
 
   // ===================================================================================================================
@@ -116,28 +150,14 @@ public final class PossibilitySet {
     return ((possibilities >>> index) & 1L) == 1L;
   }
 
-  public int[] getPossibilities() {
-    int[] result = new int[getEntropy()];
-    int index = 0;
-
-    if (result.length > 0) {
-      for (int i = 0; i < possibilitiesArray.length; i++) {
-        long value = possibilitiesArray[i];
-  
-        for (int j = 0; j < 64; j++) {
-          if ((value & 1L) == 1) {
-            result[index] = i * 64 + j;
-            index++;
-          }
-          value >>>= 1;
-        }
-      }
+  public int[] getPossibilitiesAsArray() {
+    if (!isPossibilitiesAsArrayUpdated) {
+      calculatePossibilitiesAsArray();
     }
-    
-    return result;
+    return possibilitiesAsArray;
   }
 
-  public long[] getPossibilitiesArray() {
+  public long[] getPossibilitiesAsBinary() {
     return possibilitiesArray.clone();
   }
 

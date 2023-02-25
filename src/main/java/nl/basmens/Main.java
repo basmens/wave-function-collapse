@@ -42,14 +42,14 @@ public class Main extends PApplet {
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-1.png
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-2.png
     
-    // generateCircuit();
-    generateMondriaan();
+    generateCircuit();
+    // generateMondriaan();
 
     startWfc();
   }
 
   private void startWfc() {
-    wfc = new Wfc(500, 250, features);
+    wfc = new Wfc(100, 50, features);
     Thread thread = new Thread(wfc);
     thread.start();
   }
@@ -60,13 +60,13 @@ public class Main extends PApplet {
   public void draw() {
     background(0);
 
-    // long startTime = System.nanoTime();
-    // wfc = new Wfc(100, 50, features);
-    // wfc.run();
-    // double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
-    // times.add(timeElapsed);
-    // double average = times.stream().mapToDouble(x -> x).sum() / times.size();
-    // println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
+    long startTime = System.nanoTime();
+    wfc = new Wfc(100, 50, features);
+    wfc.run();
+    double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
+    times.add(timeElapsed);
+    double average = times.stream().mapToDouble(x -> x).sum() / times.size();
+    println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
 
     // Draw grid
     stroke(50);
@@ -86,7 +86,7 @@ public class Main extends PApplet {
     for (int x = 0; x < grid.length; x++) {
       for (int y = 0; y < grid[0].length; y++) {
         if (grid[x][y].isCollapsed()) {
-          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilities()[0]);
+          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilitiesAsArray()[0]);
           if (module.getChildItem() instanceof PImage img) {
             pushMatrix();
             translate((float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
@@ -142,7 +142,7 @@ public class Main extends PApplet {
     for (int x = 0; x < grid.length; x++) {
       for (int y = 0; y < grid[0].length; y++) {
         if (grid[x][y].isCollapsed()) {
-          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilities()[0]);
+          nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilitiesAsArray()[0]);
           if (module.getChildItem() instanceof PImage img) {
             p.pushMatrix();
             p.translate((float) ((x + 0.5) * res), (float) ((y + 0.5) * res));

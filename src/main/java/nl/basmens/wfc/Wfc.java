@@ -22,7 +22,7 @@ public final class Wfc implements Runnable {
   private int[][] locationInEntropyList;
   private boolean running;
 
-  private ArrayDeque<QueueElm> stack = new ArrayDeque<QueueElm>(20000);
+  private ArrayDeque<QueueElm> stack = new ArrayDeque<>(20000);
 
   private Random random = new Random();
 
@@ -105,7 +105,7 @@ public final class Wfc implements Runnable {
       case UP:
         if (y > 0 || loopEdgesEnabledY) {
           PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-          for (int i : grid[x][(y + gridH - 1) % gridH].getPossibilities()) {
+          for (int i : grid[x][(y + gridH - 1) % gridH].getPossibilitiesAsArray()) {
             possibilities.unionWith(possibleModulesDown[i]);
           }
           tile.intersectionWith(possibilities);
@@ -114,7 +114,7 @@ public final class Wfc implements Runnable {
       case RIGHT:
         if (x > 0 || loopEdgesEnabledX) {
           PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-          for (int i : grid[(x + 1) % gridW][y].getPossibilities()) {
+          for (int i : grid[(x + 1) % gridW][y].getPossibilitiesAsArray()) {
             possibilities.unionWith(possibleModulesLeft[i]);
           }
           tile.intersectionWith(possibilities);
@@ -123,7 +123,7 @@ public final class Wfc implements Runnable {
       case DOWN:
         if (y < gridH - 1 || loopEdgesEnabledY) {
           PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-          for (int i : grid[x][(y + 1) % gridH].getPossibilities()) {
+          for (int i : grid[x][(y + 1) % gridH].getPossibilitiesAsArray()) {
             possibilities.unionWith(possibleModulesUp[i]);
           }
           tile.intersectionWith(possibilities);
@@ -132,7 +132,7 @@ public final class Wfc implements Runnable {
       case LEFT:
         if (x < gridW - 1 || loopEdgesEnabledX) {
           PossibilitySet possibilities = new PossibilitySet(modules.length, false);
-          for (int i : grid[(x + gridW - 1) % gridW][y].getPossibilities()) {
+          for (int i : grid[(x + gridW - 1) % gridW][y].getPossibilitiesAsArray()) {
             possibilities.unionWith(possibleModulesRight[i]);
           }
           tile.intersectionWith(possibilities);
@@ -171,7 +171,7 @@ public final class Wfc implements Runnable {
   public void collapseTile(int x, int y) {
     PossibilitySet tile = grid[x][y];
 
-    int[] possibilities = tile.getPossibilities();
+    int[] possibilities = tile.getPossibilitiesAsArray();
     moveBetweenEntropyLists(x, y, tile.getEntropy(), 1);
     tile.collapse(possibilities[random.nextInt(possibilities.length)]);
 
