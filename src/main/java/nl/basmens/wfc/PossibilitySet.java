@@ -113,7 +113,7 @@ public final class PossibilitySet {
 
     long possibilities = possibilitiesArray[index / 64];
     index %= 64;
-    return (possibilities >>> index) == 1L;
+    return ((possibilities >>> index) & 1L) == 1L;
   }
 
   public int[] getPossibilities() {
@@ -153,6 +153,6 @@ public final class PossibilitySet {
   }
 
   public boolean isCollapsed() {
-    return entropy == 1;
+    return getEntropy() == 1;
   }
 }
