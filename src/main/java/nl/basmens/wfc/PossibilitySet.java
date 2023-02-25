@@ -1,6 +1,6 @@
 package nl.basmens.wfc;
 
-public final class PossibilitySet {
+public class PossibilitySet {
   private static final long ALL_ONE = 0xffff_ffff_ffff_ffffL;
 
   private final long removeTrailingOnesLong;

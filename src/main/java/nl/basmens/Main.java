@@ -41,7 +41,7 @@ public class Main extends PApplet {
     // Reference images:
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-1.png
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-2.png
-    
+
     generateCircuit();
     // generateMondriaan();
 
@@ -49,7 +49,7 @@ public class Main extends PApplet {
   }
 
   private void startWfc() {
-    wfc = new Wfc(100, 50, features);
+    wfc = new Wfc(100, 50, features, 7514);
     Thread thread = new Thread(wfc);
     thread.start();
   }
@@ -60,13 +60,20 @@ public class Main extends PApplet {
   public void draw() {
     background(0);
 
-    long startTime = System.nanoTime();
-    wfc = new Wfc(100, 50, features);
-    wfc.run();
-    double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
-    times.add(timeElapsed);
-    double average = times.stream().mapToDouble(x -> x).sum() / times.size();
-    println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
+    // int seed = (int) random(10000);
+    // int seed = 7514;
+    // try {
+    //   long startTime = System.nanoTime();
+    //   wfc = new Wfc(100, 50, features, seed);
+    //   wfc.run();
+    //   double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
+    //   times.add(timeElapsed);
+    //   double average = times.stream().mapToDouble(x -> x).sum() / times.size();
+    //   println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
+    // } catch (ArrayIndexOutOfBoundsException e) {
+    //   println(seed);
+    //   throw e;
+    // }
 
     // Draw grid
     stroke(50);
@@ -95,10 +102,10 @@ public class Main extends PApplet {
             popMatrix();
           }
         } else {
-          // fill(180);
-          // textSize(30);
-          // textAlign(CENTER, CENTER);
-          // text(grid[x][y].getEntropy(), (float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
+          fill(180);
+          textSize(30);
+          textAlign(CENTER, CENTER);
+          text(grid[x][y].getEntropy(), (float) ((x + 0.5) * tileW), (float) ((y + 0.5) * tileH));
         }
       }
     }
@@ -118,15 +125,15 @@ public class Main extends PApplet {
   @Override
   public void mousePressed() {
     // if (mouseButton == LEFT) {
-    //   double tileW = (double) width / wfc.getGridW();
-    //   double tileH = (double) height / wfc.getGridH();
-    //   int x = (int) Math.floor(mouseX / tileW);
-    //   int y = (int) Math.floor(mouseY / tileH);
+    // double tileW = (double) width / wfc.getGridW();
+    // double tileH = (double) height / wfc.getGridH();
+    // int x = (int) Math.floor(mouseX / tileW);
+    // int y = (int) Math.floor(mouseY / tileH);
 
-    //   wfc.collapseTile(x, y);
+    // wfc.collapseTile(x, y);
     // } else {
-    //   startWfc();
-    //   // println(wfc.isRunning());
+    // startWfc();
+    // // println(wfc.isRunning());
     // }
   }
 
@@ -157,7 +164,6 @@ public class Main extends PApplet {
     p.save("C:/Users/basme/Downloads/wfc result.png");
     println("Saved");
   }
-
 
   private void generateCircuit() {
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
@@ -236,7 +242,6 @@ public class Main extends PApplet {
     features.setLoopEdgesEnabledX(true);
     features.setLoopEdgesEnabledY(true);
   }
-
 
   private void generateMondriaan() {
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
