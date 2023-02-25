@@ -159,8 +159,6 @@ public class Main extends PApplet {
   }
 
 
-
-
   private void generateCircuit() {
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
 
