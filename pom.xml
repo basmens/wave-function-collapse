@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>nl.cempion</groupId>
@@ -14,32 +16,26 @@
     <repository>
       <id>jitpack.io</id>
       <url>https://jitpack.io</url>
-		</repository>
+    </repository>
   </repositories>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-      <maven.compiler.source>17</maven.compiler.source>
-      <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-api</artifactId>
-      <version>2.19.0</version>
-    </dependency>
-    
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-core</artifactId>
-      <version>2.19.0</version>
+      <groupId>com.github.BenMens</groupId>
+      <artifactId>processing-bridge</artifactId>
+      <version>v4.0.1</version>
     </dependency>
 
     <dependency>
-      <groupId>com.github.BenMens</groupId>
-      <artifactId>processing-bridge</artifactId>
-      <version>4.0.1-SNAPSHOT</version>
+      <groupId>colt</groupId>
+      <artifactId>colt</artifactId>
+      <version>1.2.0</version>
     </dependency>
   </dependencies>
 
@@ -51,12 +47,12 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.0</version>
           <configuration>
-              <release>17</release>
+            <release>17</release>
           </configuration>
-        </plugin>  
-    
+        </plugin>
+
       </plugins>
     </pluginManagement>
   </build>
-  
+
 </project>

@@ -1,99 +1,73 @@
 package nl.basmens.wfc;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-
-import processing.core.PApplet;
+import java.util.Set;
 
 public class WfcFeatures {
-  private final Module[] modules;
-  private final KeyPairsMap keyRules;
+  private Module[] modules;
+  private PossibilitySet[] possibleModulesUp;
+  private PossibilitySet[] possibleModulesRight;
+  private PossibilitySet[] possibleModulesDown;
+  private PossibilitySet[] possibleModulesLeft;
 
-  private final ArrayList<IntModule> intModules;
-  private final ArrayList<HashSet<IntModule>> modulesForUpKey;
-  private final ArrayList<HashSet<IntModule>> modulesForRightKey;
-  private final ArrayList<HashSet<IntModule>> modulesForDownKey;
-  private final ArrayList<HashSet<IntModule>> modulesForLeftKey;
-
-  private final boolean loopEdgesEnabled;
+  private boolean isLoopEdgesEnabledX;
+  private boolean isLoopEdgesEnabledY;
 
   // ===================================================================================================================
   // Constructor
   // ===================================================================================================================
-  public WfcFeatures(Module[] modules, KeyPairsMap keyPairMap, boolean loopEdgesEnabled) {
-    this.keyRules = new KeyPairsMap(keyPairMap);
-    this.loopEdgesEnabled = loopEdgesEnabled;
-
-    // Calculate a map to translate the key strings to integers
-    HashMap<String, Integer> stringToIntMap = new HashMap<>();
-    int i = 0;
-    for (String s : this.keyRules.getKeySet()) {
-      stringToIntMap.put(s, i);
-      i++;
-    }
-
+  public WfcFeatures(Module[] modules, KeyPairsMap keyPairMap) {
     // Eliminate invalid modules and add rotation variants
+    Set<String> possibleKeys = keyPairMap.getKeySet();
     this.modules = Arrays.stream(modules)
-        .filter(m -> stringToIntMap.containsKey(m.keyUp) && stringToIntMap.containsKey(m.keyRight)
-            && stringToIntMap.containsKey(m.keyDown) && stringToIntMap.containsKey(m.keyLeft))
+        .filter(m -> possibleKeys.contains(m.keyUp) && possibleKeys.contains(m.keyRight)
+            && possibleKeys.contains(m.keyDown) && possibleKeys.contains(m.keyLeft))
         .flatMap(m -> Arrays.stream(m.rotations).mapToObj(r -> rotateModule(m, r)))
         .toArray(Module[]::new);
-    this.intModules = new ArrayList<>(this.modules.length);
 
-    // Create empty arrays of sets
-    int keysCount = stringToIntMap.size();
-    ArrayList<HashSet<IntModule>> modulesWithUpKey = new ArrayList<>(keysCount);
-    ArrayList<HashSet<IntModule>> modulesWithRightKey = new ArrayList<>(keysCount);
-    ArrayList<HashSet<IntModule>> modulesWithDownKey = new ArrayList<>(keysCount);
-    ArrayList<HashSet<IntModule>> modulesWithLeftKey = new ArrayList<>(keysCount);
-    modulesForUpKey = new ArrayList<>(keysCount);
-    modulesForRightKey = new ArrayList<>(keysCount);
-    modulesForDownKey = new ArrayList<>(keysCount);
-    modulesForLeftKey = new ArrayList<>(keysCount);
-    for (i = 0; i < stringToIntMap.size(); i++) {
-      modulesWithUpKey.add(new HashSet<>());
-      modulesWithRightKey.add(new HashSet<>());
-      modulesWithDownKey.add(new HashSet<>());
-      modulesWithLeftKey.add(new HashSet<>());
-      modulesForUpKey.add(new HashSet<>());
-      modulesForRightKey.add(new HashSet<>());
-      modulesForDownKey.add(new HashSet<>());
-      modulesForLeftKey.add(new HashSet<>());
+    // Track modulesWith*Key
+    int keysCount = possibleKeys.size();
+    int moduleCount = this.modules.length;
+    HashMap<String, PossibilitySet> modulesWithUpKey = new HashMap<>(keysCount);
+    HashMap<String, PossibilitySet> modulesWithRightKey = new HashMap<>(keysCount);
+    HashMap<String, PossibilitySet> modulesWithDownKey = new HashMap<>(keysCount);
+    HashMap<String, PossibilitySet> modulesWithLeftKey = new HashMap<>(keysCount);
+    for (int i = 0; i < moduleCount; i++) {
+      Module module = this.modules[i];
+      modulesWithUpKey.computeIfAbsent(module.keyUp, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithRightKey.computeIfAbsent(module.keyRight, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithDownKey.computeIfAbsent(module.keyDown, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
+      modulesWithLeftKey.computeIfAbsent(module.keyLeft, x -> new PossibilitySet(moduleCount, false))
+      .addPossibility(i);
     }
-    // Fill the intModules array and fill the modulesWith_Key sets
-    for (i = 0; i < this.modules.length; i++) {
-      Module mod = this.modules[i];
-      IntModule m = new IntModule(stringToIntMap.get(mod.keyUp), stringToIntMap.get(mod.keyRight),
-          stringToIntMap.get(mod.keyDown), stringToIntMap.get(mod.keyLeft), mod);
-      this.intModules.add(m);
+    
+    // Fill possibleModules* arrays
+    possibleModulesUp = new PossibilitySet[moduleCount];
+    possibleModulesRight = new PossibilitySet[moduleCount];
+    possibleModulesDown = new PossibilitySet[moduleCount];
+    possibleModulesLeft = new PossibilitySet[moduleCount];
+    for (int i = 0; i < moduleCount; i++) {
+      Module module = this.modules[i];
+      Set<String> possibleKeysUp = keyPairMap.getPairs(module.keyUp);
+      possibleModulesUp[i] = possibleKeysUp.stream().map(modulesWithDownKey::get)
+          .reduce(new PossibilitySet(moduleCount, false), PossibilitySet::unionWith);
 
-      modulesWithUpKey.get(m.keyUp).add(m);
-      modulesWithRightKey.get(m.keyRight).add(m);
-      modulesWithDownKey.get(m.keyDown).add(m);
-      modulesWithLeftKey.get(m.keyLeft).add(m);
+      Set<String> possibleKeysRight = keyPairMap.getPairs(module.keyRight);
+      possibleModulesRight[i] = possibleKeysRight.stream().map(modulesWithLeftKey::get)
+          .reduce(new PossibilitySet(moduleCount, false), PossibilitySet::unionWith);
+
+      Set<String> possibleKeysDown = keyPairMap.getPairs(module.keyDown);
+      possibleModulesDown[i] = possibleKeysDown.stream().map(modulesWithUpKey::get)
+          .reduce(new PossibilitySet(moduleCount, false), PossibilitySet::unionWith);
+
+      Set<String> possibleKeysLeft = keyPairMap.getPairs(module.keyLeft);
+      possibleModulesLeft[i] = possibleKeysLeft.stream().map(modulesWithRightKey::get)
+          .reduce(new PossibilitySet(moduleCount, false), PossibilitySet::unionWith);
     }
-    // Fill the modulesFor_Key arrays
-    for (String k : this.keyRules.getKeySet()) {
-      int intKey = stringToIntMap.get(k);
-      HashSet<IntModule> modulesForUpKeySet = modulesForUpKey.get(intKey);
-      HashSet<IntModule> modulesForRightKeySet = modulesForRightKey.get(intKey);
-      HashSet<IntModule> modulesForDownKeySet = modulesForDownKey.get(intKey);
-      HashSet<IntModule> modulesForLeftKeySet = modulesForLeftKey.get(intKey);
-
-      this.keyRules.getPairs(k).forEach((String v) -> {
-        int intValue = stringToIntMap.get(v);
-        modulesForUpKeySet.addAll(modulesWithDownKey.get(intValue));
-        modulesForDownKeySet.addAll(modulesWithUpKey.get(intValue));
-        modulesForRightKeySet.addAll(modulesWithLeftKey.get(intValue));
-        modulesForLeftKeySet.addAll(modulesWithRightKey.get(intValue));
-      });
-    }
-
-    PApplet.println();
-    stringToIntMap.entrySet().forEach(entry -> PApplet.println(entry.getValue() + " - " + entry.getKey()));
   }
 
   private static Module rotateModule(Module m, int rot) {
@@ -113,37 +87,45 @@ public class WfcFeatures {
   }
 
   // ===================================================================================================================
-  // Getters
+  // Getters and setters
   // ===================================================================================================================
-  public boolean isLoopEdgesEnabled() {
-    return loopEdgesEnabled;
+  public boolean isLoopEdgesEnabledX() {
+    return isLoopEdgesEnabledX;
+  }
+
+  public void setLoopEdgesEnabledX(boolean loopEdgesEnabledX) {
+    this.isLoopEdgesEnabledX = loopEdgesEnabledX;
+  }
+
+  public boolean isLoopEdgesEnabledY() {
+    return isLoopEdgesEnabledY;
+  }
+
+  public void setLoopEdgesEnabledY(boolean loopEdgesEnabledY) {
+    this.isLoopEdgesEnabledY = loopEdgesEnabledY;
   }
 
   public Module[] getModules() {
     return modules.clone();
   }
 
-  public KeyPairsMap getKeyRules() {
-    return keyRules;
+  public Module getModule(int index) {
+    return modules[index];
   }
 
-  public List<IntModule> getIntModules() {
-    return (List<IntModule>) intModules.clone();
+  public PossibilitySet[] getPossibleModulesUp() {
+    return possibleModulesUp.clone();
   }
 
-  public List<HashSet<IntModule>> getModulesForUpKey() {
-    return new ArrayList<>(modulesForUpKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
+  public PossibilitySet[] getPossibleModulesRight() {
+    return possibleModulesRight.clone();
   }
 
-  public List<HashSet<IntModule>> getModulesForRightKey() {
-    return new ArrayList<>(modulesForRightKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
+  public PossibilitySet[] getPossibleModulesDown() {
+    return possibleModulesDown.clone();
   }
 
-  public List<HashSet<IntModule>> getModulesForDownKey() {
-    return new ArrayList<>(modulesForDownKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
-  }
-
-  public List<HashSet<IntModule>> getModulesForLeftKey() {
-    return new ArrayList<>(modulesForLeftKey.stream().map(s -> (HashSet<IntModule>) s.clone()).toList());
+  public PossibilitySet[] getPossibleModulesLeft() {
+    return possibleModulesLeft.clone();
   }
 }
