@@ -60,20 +60,20 @@ public class Main extends PApplet {
   public void draw() {
     background(0);
 
-    // int seed = (int) random(10000);
+    int seed = (int) random(10000);
     // int seed = 7514;
-    // try {
-    //   long startTime = System.nanoTime();
-    //   wfc = new Wfc(100, 50, features, seed);
-    //   wfc.run();
-    //   double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
-    //   times.add(timeElapsed);
-    //   double average = times.stream().mapToDouble(x -> x).sum() / times.size();
-    //   println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
-    // } catch (ArrayIndexOutOfBoundsException e) {
-    //   println(seed);
-    //   throw e;
-    // }
+    try {
+      long startTime = System.nanoTime();
+      wfc = new Wfc(100, 50, features, seed);
+      wfc.run();
+      double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
+      times.add(timeElapsed);
+      double average = times.stream().mapToDouble(x -> x).sum() / times.size();
+      println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
+    } catch (ArrayIndexOutOfBoundsException e) {
+      println(seed);
+      throw e;
+    }
 
     // Draw grid
     stroke(50);

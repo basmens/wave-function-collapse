@@ -40,13 +40,16 @@ public final class Wfc implements Runnable {
   // ===================================================================================================================
   // Constructor
   // ===================================================================================================================
-  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures, int seed) {
+  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures) {
     this.gridW = gridW;
     this.gridH = gridH;
 
     setWfcFeatures(wfcFeatures);
+  }
 
-    random.setSeed(seed);
+  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures, int seed) {
+    this(gridW, gridH, wfcFeatures);
+    this.random.setSeed(seed);
   }
 
   // ===================================================================================================================
