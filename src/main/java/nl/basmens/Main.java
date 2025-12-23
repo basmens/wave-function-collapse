@@ -19,8 +19,21 @@ import processing.opengl.PGraphicsOpenGL;
 public class Main extends PApplet {
   private WfcFeatures features;
   private Wfc wfc;
+  private int tileResolution;
+  
+  private ArrayList<Double> times = new ArrayList<>();
 
-  private int res;
+  // Settings
+  private int tileCountX = 100;
+  private int tileCountY = 50;
+  private boolean loopEdgesX = false;
+  private boolean loopEdgesY = false;
+
+  private boolean useSeed = false;
+  private int seed = 0;
+  private int tileSet = 0; // 0 = circuit, 1 = mondriaan
+
+  private boolean testPerformance = false; // Rough test, influenced by JIT
 
   // ===================================================================================================================
   // Native processing functions for lifecycle
@@ -42,37 +55,38 @@ public class Main extends PApplet {
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-1.png
     // https://raw.githubusercontent.com/mxgmn/WaveFunctionCollapse/master/images/circuit-2.png
 
-    generateCircuit();
-    // generateMondriaan();
+    switch (tileSet) {
+      case 0 -> generateCircuit();
+      case 1 -> generateMondriaan();
+      default -> throw new IllegalArgumentException("Invalid tile set selected");
+    }
 
     startWfc();
   }
 
   private void startWfc() {
-    wfc = new Wfc(100, 50, features, 7514);
+    wfc = useSeed ? new Wfc(tileCountX, tileCountY, features, seed) : new Wfc(tileCountX, tileCountY, features);
     Thread thread = new Thread(wfc);
     thread.start();
   }
-
-  private ArrayList<Double> times = new ArrayList<>();
 
   @Override
   public void draw() {
     background(0);
 
-    int seed = (int) random(10000);
-    // int seed = 7514;
-    try {
-      long startTime = System.nanoTime();
-      wfc = new Wfc(100, 50, features, seed);
-      wfc.run();
-      double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
-      times.add(timeElapsed);
-      double average = times.stream().mapToDouble(x -> x).sum() / times.size();
-      println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
-    } catch (ArrayIndexOutOfBoundsException e) {
-      println(seed);
-      throw e;
+    if (testPerformance) {
+      try {
+        long startTime = System.nanoTime();
+        wfc = new Wfc(tileCountX, tileCountY, features, (int) random(10000));
+        wfc.run();
+        double timeElapsed = (System.nanoTime() - startTime) / 1_000_000D;
+        times.add(timeElapsed);
+        double average = times.stream().mapToDouble(x -> x).sum() / times.size();
+        println(String.format(Locale.ENGLISH, "%.3f - %.3f - ", timeElapsed, average) + times.size());
+      } catch (ArrayIndexOutOfBoundsException e) {
+        println(seed);
+        throw e;
+      }
     }
 
     // Draw grid
@@ -139,9 +153,12 @@ public class Main extends PApplet {
 
   @Override
   public void keyPressed() {
+    if (key != ' ')
+      return;
+
     println("Saving...");
     PossibilitySet[][] grid = wfc.getGrid();
-    PGraphics p = createGraphics(res * wfc.getGridW(), res * wfc.getGridH());
+    PGraphics p = createGraphics(tileResolution * wfc.getGridW(), tileResolution * wfc.getGridH());
     p.beginDraw();
     p.background(0);
     p.imageMode(CENTER);
@@ -152,7 +169,7 @@ public class Main extends PApplet {
           nl.basmens.wfc.Module module = wfc.getModule(grid[x][y].getPossibilitiesAsArray()[0]);
           if (module.getChildItem() instanceof PImage img) {
             p.pushMatrix();
-            p.translate((float) ((x + 0.5) * res), (float) ((y + 0.5) * res));
+            p.translate((float) ((x + 0.5) * tileResolution), (float) ((y + 0.5) * tileResolution));
             p.rotate(HALF_PI * module.rotations[0]);
             p.image(img, 0, 0);
             p.popMatrix();
@@ -161,7 +178,7 @@ public class Main extends PApplet {
       }
     }
     p.endDraw();
-    p.save("C:/Users/basme/Downloads/wfc result.png");
+    p.save("wfc result.png");
     println("Saved");
   }
 
@@ -169,7 +186,7 @@ public class Main extends PApplet {
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
 
     try {
-      URL resource = Main.class.getResource("/patterns/circuit3");
+      URL resource = getClass().getClassLoader().getResource("patterns/circuit3");
       String path = Paths.get(resource.toURI()).toAbsolutePath().toString() + FileSystems.getDefault().getSeparator();
 
       PImage image = loadImage(path + "board.png");
@@ -224,7 +241,7 @@ public class Main extends PApplet {
       modules.add(new nl.basmens.wfc.Module("wire", "wire", "board", "wire",
           new int[] { 0, 1, 2, 3 }, image));
 
-      res = image.width;
+      tileResolution = image.width;
     } catch (URISyntaxException e) {
       e.printStackTrace();
     }
@@ -239,15 +256,15 @@ public class Main extends PApplet {
 
     // Create WfcFeatures
     features = new WfcFeatures(modules.toArray(nl.basmens.wfc.Module[]::new), keyPairsMap);
-    features.setLoopEdgesEnabledX(true);
-    features.setLoopEdgesEnabledY(true);
+    features.setLoopEdgesEnabledX(loopEdgesX);
+    features.setLoopEdgesEnabledY(loopEdgesY);
   }
 
   private void generateMondriaan() {
     ArrayList<nl.basmens.wfc.Module> modules = new ArrayList<>();
 
     try {
-      URL resource = Main.class.getResource("/patterns/mondriaan");
+      URL resource = getClass().getClassLoader().getResource("patterns/mondriaan");
       String path = Paths.get(resource.toURI()).toAbsolutePath().toString() + FileSystems.getDefault().getSeparator();
 
       PImage image = loadImage(path + "black.png");
@@ -278,7 +295,7 @@ public class Main extends PApplet {
       modules.add(new nl.basmens.wfc.Module("aqua", "aqua", "aqua", "aqua",
           new int[] { 0 }, image));
 
-      res = image.width;
+      tileResolution = image.width;
     } catch (URISyntaxException e) {
       e.printStackTrace();
     }
@@ -301,8 +318,8 @@ public class Main extends PApplet {
 
     // Create WfcFeatures
     features = new WfcFeatures(modules.toArray(nl.basmens.wfc.Module[]::new), keyPairsMap);
-    // features.setLoopEdgesEnabledX(true);
-    // features.setLoopEdgesEnabledY(true);
+    features.setLoopEdgesEnabledX(loopEdgesX);
+    features.setLoopEdgesEnabledY(loopEdgesY);
   }
 
   // ===================================================================================================================
