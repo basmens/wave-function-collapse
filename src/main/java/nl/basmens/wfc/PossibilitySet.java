@@ -44,10 +44,9 @@ public final class PossibilitySet {
     entropy = 0;
     for (int i = 0; i < possibilitiesArray.length; i++) {
       long value = possibilitiesArray[i];
-
-      for (int j = 0; j < 64; j++) {
-        entropy += value & 1L;
-        value >>>= 1;
+      while (value != 0) {
+        value &= value - 1; // Unset lsb
+        entropy++;
       }
     }
     isEntropyUpdated = true;
@@ -61,7 +60,7 @@ public final class PossibilitySet {
       for (int i = 0; i < possibilitiesArray.length; i++) {
         long value = possibilitiesArray[i];
   
-        for (int j = 0; j < 64; j++) {
+        for (int j = 0; j < 64 && value != 0; j++) {
           if ((value & 1L) == 1) {
             possibilitiesAsArray[index] = i * 64 + j;
             index++;

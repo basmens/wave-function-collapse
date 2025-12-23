@@ -46,6 +46,11 @@ public final class Wfc implements Runnable {
     setWfcFeatures(wfcFeatures);
   }
 
+  public Wfc(int gridW, int gridH, WfcFeatures wfcFeatures, int seed) {
+    this(gridW, gridH, wfcFeatures);
+    this.random.setSeed(seed);
+  }
+
   // ===================================================================================================================
   // Functionality
   // ===================================================================================================================
